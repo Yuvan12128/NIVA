@@ -1,0 +1,25 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "niva-discovery-1792429167",
+          "appId": "1:152596573565:android:30cf2dbdff74ca7306f014",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "niva-discovery-1792429167",
+          "configurations": {
+            "android": "1:152596573565:android:30cf2dbdff74ca7306f014",
+            "web": "1:152596573565:web:ed611ef4167d67cb06f014"
+          }
+        }
+      }
+    }
+  }
+}
