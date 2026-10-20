@@ -40,22 +40,6 @@ class NotificationRepository {
     }
 
     try {
-      // Prevent duplicate unread notifications for the same reference item & type
-      final existing = await _notificationsCollection
-          .where('recipientId', isEqualTo: recipientId)
-          .where('referenceId', isEqualTo: referenceId)
-          .where('type', isEqualTo: type)
-          .where('isRead', isEqualTo: false)
-          .limit(1)
-          .get();
-
-      if (existing.docs.isNotEmpty) {
-        debugPrint(
-          'NotificationRepository: duplicate unread notification prevented.',
-        );
-        return existing.docs.first.id;
-      }
-
       final docRef = _notificationsCollection.doc();
       final notification = NotificationModel(
         id: docRef.id,

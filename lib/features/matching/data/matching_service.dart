@@ -153,73 +153,7 @@ class MatchingService {
         debugPrint('MatchingService: users query notice: $e');
       }
 
-      // 3. Fallback to curated peer helpers if no other candidates exist yet
-      if (candidates.isEmpty) {
-        final seedHelpers = [
-          (
-            id: 'peer_helper_suresh',
-            name: 'Suresh Raina',
-            skills: ['Java', 'Algorithms', 'DSA', 'Backend', 'Mentorship'],
-            location: 'Chennai',
-            avail: 'Available today',
-            cat: 'Education',
-            trust: 100,
-          ),
-          (
-            id: 'peer_helper_priya',
-            name: 'Priya Sharma',
-            skills: ['React', 'Flutter', 'Frontend', 'Mobile', 'UI Design'],
-            location: 'Bengaluru',
-            avail: 'Flexible',
-            cat: 'Engineering',
-            trust: 98,
-          ),
-          (
-            id: 'peer_helper_karthik',
-            name: 'Karthik Raja',
-            skills: ['Hardware', 'Laptop repair', 'IT Support', 'Electronics'],
-            location: 'Chennai',
-            avail: 'Weekends',
-            cat: 'Services',
-            trust: 96,
-          ),
-        ];
-
-        for (final seed in seedHelpers) {
-          if (seed.id == activeUserId || seed.id == need.userId) continue;
-
-          final scoreBreakdown = computeMatchScore(
-            need: need,
-            candidateSkills: seed.skills,
-            candidateLocation: seed.location,
-            candidateAvailability: seed.avail,
-            candidateCategory: seed.cat,
-            candidateTrustScore: seed.trust,
-          );
-
-          candidates.add(
-            MatchResult(
-              id: seed.id,
-              userId: seed.id,
-              name: seed.name,
-              category: seed.cat,
-              skills: seed.skills,
-              location: seed.location,
-              availability: seed.avail,
-              trustScore: seed.trust,
-              score: scoreBreakdown.totalScore,
-              matchedSkills: scoreBreakdown.matchedSkills,
-              skillScore: scoreBreakdown.skillScore,
-              locationScore: scoreBreakdown.locationScore,
-              availabilityScore: scoreBreakdown.availabilityScore,
-              categoryScore: scoreBreakdown.categoryScore,
-              trustScoreComponent: scoreBreakdown.trustScore,
-            ),
-          );
-        }
-      }
-
-      // 4. Rank candidates by highest total match score descending
+      // 3. Rank candidates by highest total match score descending
       candidates.sort((a, b) => b.score.compareTo(a.score));
 
       return candidates.take(limit).toList(growable: false);

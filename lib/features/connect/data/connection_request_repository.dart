@@ -64,26 +64,20 @@ class ConnectionRequestRepository {
     }
 
     try {
-      // 2. Prevent duplicate pending requests for the same need & users
-      final existing = await _requestsCollection
-          .where('fromUserId', isEqualTo: fromUserId)
-          .where('toUserId', isEqualTo: toUserId)
-          .where('needId', isEqualTo: needId)
-          .where('status', isEqualTo: 'pending')
-          .limit(1)
-          .get();
-
-      if (existing.docs.isNotEmpty) {
+      // 2. Prevent duplicate pending requests using deterministic doc ID (index-free)
+      final docId = '${fromUserId}_${toUserId}_$needId';
+      final existingDoc = await _requestsCollection.doc(docId).get();
+      if (existingDoc.exists && existingDoc.data()?['status'] == 'pending') {
         debugPrint(
           'ConnectionRequestRepository: duplicate pending request detected.',
         );
-        return existing.docs.first.id;
+        return docId;
       }
 
       // 3. Create new connection request
-      final docRef = _requestsCollection.doc();
+      final docRef = _requestsCollection.doc(docId);
       final request = ConnectionRequestModel(
-        id: docRef.id,
+        id: docId,
         fromUserId: fromUserId,
         toUserId: toUserId,
         needId: needId,
@@ -105,13 +99,13 @@ class ConnectionRequestRepository {
           type: 'connection_request',
           title: 'New Connection Request',
           body: '$senderName wants to connect with you.',
-          referenceId: docRef.id,
+          referenceId: docId,
         );
       } catch (notifErr) {
         debugPrint('Notice: notification creation error: $notifErr');
       }
 
-      return docRef.id;
+      return docId;
     } catch (e) {
       debugPrint('ConnectionRequestRepository.sendConnectRequest error: $e');
       rethrow;
