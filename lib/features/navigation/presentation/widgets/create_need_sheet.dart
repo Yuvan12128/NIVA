@@ -4,6 +4,10 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/widgets/niva_button.dart';
+import '../../../auth/data/auth_service.dart';
+import '../../../matching/presentation/widgets/matching_sheet.dart';
+import '../../../needs/data/need_model.dart';
+import '../../../needs/data/need_repository.dart';
 
 enum _SheetStep { selectIntent, needForm, helpForm, success }
 
@@ -17,12 +21,14 @@ class CreateNeedSheet extends StatefulWidget {
     this.onHelpSelected,
     this.onNeedCreated,
     this.onHelpCreated,
+    this.needRepository,
   });
 
   final VoidCallback? onNeedSelected;
   final VoidCallback? onHelpSelected;
   final ValueChanged<String>? onNeedCreated;
   final ValueChanged<String>? onHelpCreated;
+  final NeedRepository? needRepository;
 
   static void show(
     BuildContext context, {
@@ -30,6 +36,7 @@ class CreateNeedSheet extends StatefulWidget {
     VoidCallback? onHelpSelected,
     ValueChanged<String>? onNeedCreated,
     ValueChanged<String>? onHelpCreated,
+    NeedRepository? needRepository,
   }) {
     showModalBottomSheet<void>(
       context: context,
@@ -40,6 +47,7 @@ class CreateNeedSheet extends StatefulWidget {
         onHelpSelected: onHelpSelected,
         onNeedCreated: onNeedCreated,
         onHelpCreated: onHelpCreated,
+        needRepository: needRepository,
       ),
     );
   }
@@ -50,6 +58,10 @@ class CreateNeedSheet extends StatefulWidget {
 
 class _CreateNeedSheetState extends State<CreateNeedSheet> {
   _SheetStep _currentStep = _SheetStep.selectIntent;
+  bool _isSubmitting = false;
+  NeedModel? _lastCreatedNeed;
+  late final NeedRepository _needRepository =
+      widget.needRepository ?? NeedRepository();
 
   // I Need Form State
   final TextEditingController _needController = TextEditingController();
@@ -122,24 +134,128 @@ class _CreateNeedSheetState extends State<CreateNeedSheet> {
     super.dispose();
   }
 
-  void _submitNeed() {
+  Future<void> _submitNeed() async {
     final text = _needController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _isSubmitting) return;
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      final user = AuthService.instance.currentUser;
+      final userId = user?.uid ?? 'anonymous';
+      final authorName =
+          (user?.displayName != null && user!.displayName!.isNotEmpty)
+          ? user.displayName
+          : (user?.email != null && user!.email!.isNotEmpty
+                ? user.email!.split('@').first
+                : null);
+
+      final need = NeedModel(
+        needId: '',
+        userId: userId,
+        type: 'need',
+        title: text,
+        description: text,
+        category: _selectedNeedCategory ?? 'General',
+        skills: const [],
+        location: _needLocationController.text.trim().isNotEmpty
+            ? _needLocationController.text.trim()
+            : 'Remote',
+        urgency: _selectedNeedUrgency ?? 'Flexible',
+        budget: _needBudgetController.text.trim().isNotEmpty
+            ? _needBudgetController.text.trim()
+            : null,
+        status: 'active',
+        authorName: authorName,
+      );
+
+      final docId = await _needRepository.createNeed(need);
+      _lastCreatedNeed = need.copyWith(needId: docId);
+    } catch (e) {
+      debugPrint('CreateNeedSheet._submitNeed error: $e');
+      _lastCreatedNeed = NeedModel(
+        needId: 'temp_local',
+        userId: AuthService.instance.currentUser?.uid ?? 'anonymous',
+        type: 'need',
+        title: text,
+        description: text,
+        category: _selectedNeedCategory ?? 'General',
+        skills: const [],
+        location: _needLocationController.text.trim().isNotEmpty
+            ? _needLocationController.text.trim()
+            : 'Remote',
+        urgency: _selectedNeedUrgency ?? 'Flexible',
+        budget: _needBudgetController.text.trim().isNotEmpty
+            ? _needBudgetController.text.trim()
+            : null,
+      );
+    }
+
+    if (!mounted) return;
 
     widget.onNeedCreated?.call(text);
     setState(() {
+      _isSubmitting = false;
       _successTitle = 'Need Published!';
       _successSubtitle = 'NIVA is discovering matching people, communities, opportunities, and services for your need.';
       _currentStep = _SheetStep.success;
     });
   }
 
-  void _submitHelp() {
+  Future<void> _submitHelp() async {
     final text = _helpController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _isSubmitting) return;
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      final user = AuthService.instance.currentUser;
+      final userId = user?.uid ?? 'anonymous';
+      final authorName =
+          (user?.displayName != null && user!.displayName!.isNotEmpty)
+          ? user.displayName
+          : (user?.email != null && user!.email!.isNotEmpty
+                ? user.email!.split('@').first
+                : null);
+
+      final skills = _helpSkillsController.text
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+
+      final need = NeedModel(
+        needId: '',
+        userId: userId,
+        type: 'help',
+        title: text,
+        description: text,
+        category: 'General',
+        skills: skills,
+        location: _helpLocationController.text.trim().isNotEmpty
+            ? _helpLocationController.text.trim()
+            : 'Remote',
+        urgency: 'Flexible',
+        availability: _selectedHelpAvailability ?? 'Flexible',
+        status: 'active',
+        authorName: authorName,
+      );
+
+      await _needRepository.createNeed(need);
+    } catch (e) {
+      debugPrint('CreateNeedSheet._submitHelp error: $e');
+    }
+
+    if (!mounted) return;
 
     widget.onHelpCreated?.call(text);
     setState(() {
+      _isSubmitting = false;
+      _lastCreatedNeed = null;
       _successTitle = 'Capability Shared!';
       _successSubtitle = 'Your capability is now discoverable across NIVA. When someone expresses a relevant need, they can discover you.';
       _currentStep = _SheetStep.success;
@@ -510,7 +626,8 @@ class _CreateNeedSheetState extends State<CreateNeedSheet> {
         NivaButton(
           label: 'Continue',
           isFullWidth: true,
-          onPressed: _needController.text.trim().isNotEmpty
+          isLoading: _isSubmitting,
+          onPressed: (_needController.text.trim().isNotEmpty && !_isSubmitting)
               ? _submitNeed
               : null,
         ),
@@ -773,7 +890,8 @@ class _CreateNeedSheetState extends State<CreateNeedSheet> {
         NivaButton(
           label: 'Continue',
           isFullWidth: true,
-          onPressed: _helpController.text.trim().isNotEmpty
+          isLoading: _isSubmitting,
+          onPressed: (_helpController.text.trim().isNotEmpty && !_isSubmitting)
               ? _submitHelp
               : null,
         ),
@@ -818,11 +936,30 @@ class _CreateNeedSheetState extends State<CreateNeedSheet> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: AppSpacing.xxl),
-          NivaButton(
-            label: 'Done',
-            isFullWidth: true,
-            onPressed: () => Navigator.pop(context),
-          ),
+          if (_lastCreatedNeed != null && _lastCreatedNeed!.type == 'need') ...[
+            NivaButton(
+              label: 'View Matching Helpers',
+              isFullWidth: true,
+              onPressed: () {
+                final need = _lastCreatedNeed!;
+                Navigator.pop(context);
+                MatchingSheet.show(context, need: need);
+              },
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            NivaButton(
+              label: 'Done',
+              variant: NivaButtonVariant.secondary,
+              isFullWidth: true,
+              onPressed: () => Navigator.pop(context),
+            ),
+          ] else ...[
+            NivaButton(
+              label: 'Done',
+              isFullWidth: true,
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
           const SizedBox(height: AppSpacing.sm),
         ],
       ),

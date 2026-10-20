@@ -9,20 +9,253 @@ service cloud.firestore {
       allow read: if request.auth != null;
       
       // User can create their own profile document during signup
+      // Must not contain private email in public profile
       allow create: if request.auth != null
                     && request.auth.uid == userId
+                    && (!('email' in request.resource.data))
                     && request.resource.data.trustScore == 100
                     && request.resource.data.createdAt == request.time;
       
       // User can update only their own profile
-      // Cannot modify another user's profile, cannot alter trustScore, cannot overwrite createdAt
+      // Cannot add private email, cannot alter trustScore, cannot overwrite createdAt
       allow update: if request.auth != null
                     && request.auth.uid == userId
+                    && (!('email' in request.resource.data))
                     && request.resource.data.trustScore == resource.data.trustScore
                     && request.resource.data.createdAt == resource.data.createdAt
                     && request.resource.data.updatedAt == request.time;
+
+      // Safe trustScore update strictly from verified reviews
+      // Caller must NOT be the user, must link to an existing verified review document submitted by caller
+      allow update: if request.auth != null
+                    && request.auth.uid != userId
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['trustScore', 'updatedAt', 'lastReviewId'])
+                    && request.resource.data.trustScore is int
+                    && request.resource.data.trustScore >= 20
+                    && request.resource.data.trustScore <= 100
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.lastReviewId is string
+                    && exists(/databases/$(database)/documents/reviews/$(request.resource.data.lastReviewId))
+                    && get(/databases/$(database)/documents/reviews/$(request.resource.data.lastReviewId)).data.reviewerId == request.auth.uid
+                    && get(/databases/$(database)/documents/reviews/$(request.resource.data.lastReviewId)).data.revieweeId == userId;
       
       // Prevent deletion of profiles by default
+      allow delete: if false;
+
+      // Private user account data: users/{userId}/private/{document}
+      match /private/{document} {
+        // Only the account owner can read or write their private account documents
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // Need & Help items rules: needs/{needId}
+    match /needs/{needId} {
+      // Authenticated users can read published/discoverable needs
+      allow read: if request.auth != null;
+
+      // User can create their own need or help document
+      allow create: if request.auth != null
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.type in ['need', 'help']
+                    && request.resource.data.title is string
+                    && request.resource.data.title.size() > 0
+                    && request.resource.data.createdAt == request.time;
+
+      // Author can update only their own document
+      // userId and createdAt cannot be modified after creation
+      allow update: if request.auth != null
+                    && resource.data.userId == request.auth.uid
+                    && request.resource.data.userId == resource.data.userId
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && request.resource.data.updatedAt == request.time;
+
+      // Author can delete only their own document
+      allow delete: if request.auth != null
+                    && resource.data.userId == request.auth.uid;
+    }
+
+    // Connection request rules: connection_requests/{requestId}
+    match /connection_requests/{requestId} {
+      // Sender and receiver can read requests involving themselves
+      allow read: if request.auth != null
+                  && (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid);
+
+      // Authenticated users can create connection requests
+      // fromUserId must equal auth uid, cannot send request to self
+      // Status must initialize to 'pending'
+      allow create: if request.auth != null
+                    && request.resource.data.fromUserId == request.auth.uid
+                    && request.resource.data.toUserId != request.auth.uid
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.createdAt == request.time;
+
+      // Only the receiver (toUserId) can accept or decline
+      // Core fields and createdAt are immutable
+      allow update: if request.auth != null
+                    && resource.data.toUserId == request.auth.uid
+                    && request.resource.data.fromUserId == resource.data.fromUserId
+                    && request.resource.data.toUserId == resource.data.toUserId
+                    && request.resource.data.needId == resource.data.needId
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && request.resource.data.status in ['accepted', 'declined']
+                    && request.resource.data.updatedAt == request.time;
+
+      // Prevent direct deletion of requests
+      allow delete: if false;
+    }
+
+    // Chat conversation rules: chats/{chatId}
+    match /chats/{chatId} {
+      // Only chat participants can read their conversation
+      allow read: if request.auth != null
+                  && request.auth.uid in resource.data.participantIds;
+
+      // Only chat participants can initialize the conversation
+      allow create: if request.auth != null
+                    && request.auth.uid in request.resource.data.participantIds
+                    && request.resource.data.participantIds.size() == 2
+                    && request.resource.data.createdAt == request.time;
+
+      // Only chat participants can update metadata (lastMessage / updatedAt)
+      allow update: if request.auth != null
+                    && request.auth.uid in resource.data.participantIds
+                    && request.resource.data.participantIds == resource.data.participantIds
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && request.resource.data.updatedAt == request.time;
+
+      // Deletion of conversations is prevented
+      allow delete: if false;
+    }
+
+    // Chat messages rules: messages/{messageId}
+    match /messages/{messageId} {
+      // Only sender or receiver can read messages
+      allow read: if request.auth != null
+                  && (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid);
+
+      // Only authenticated sender can send a message
+      allow create: if request.auth != null
+                    && request.resource.data.senderId == request.auth.uid
+                    && request.resource.data.receiverId != request.auth.uid
+                    && request.resource.data.text is string
+                    && request.resource.data.text.size() > 0
+                    && request.resource.data.createdAt == request.time;
+
+      // Messages are immutable once delivered
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // In-app notifications rules: notifications/{notificationId}
+    match /notifications/{notificationId} {
+      // Recipient can read their own notifications
+      allow read: if request.auth != null
+                  && resource.data.recipientId == request.auth.uid;
+
+      // Authenticated users can create notifications for another user
+      // senderId must equal auth uid, cannot notify oneself
+      // Valid type and initialized to isRead == false
+      allow create: if request.auth != null
+                    && request.resource.data.senderId == request.auth.uid
+                    && request.resource.data.recipientId != request.auth.uid
+                    && request.resource.data.type in ['connection_request', 'connection_accepted', 'new_message']
+                    && request.resource.data.isRead == false
+                    && request.resource.data.createdAt == request.time;
+
+      // Recipient can update isRead status
+      // Core fields (recipientId, senderId, type, referenceId, createdAt) are immutable
+      allow update: if request.auth != null
+                    && resource.data.recipientId == request.auth.uid
+                    && request.resource.data.recipientId == resource.data.recipientId
+                    && request.resource.data.senderId == resource.data.senderId
+                    && request.resource.data.type == resource.data.type
+                    && request.resource.data.referenceId == resource.data.referenceId
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && request.resource.data.isRead is bool;
+
+      // Recipient can dismiss/delete their own notifications
+      allow delete: if request.auth != null
+                    && resource.data.recipientId == request.auth.uid;
+    }
+
+    // Trust & Reviews rules: reviews/{reviewId}
+    match /reviews/{reviewId} {
+      // Authenticated users can read reviews for discovery and trust
+      allow read: if request.auth != null;
+
+      // Authenticated reviewer can submit a review
+      // reviewerId must equal auth.uid, cannot review self
+      // rating must be integer 1 to 5
+      // reviewText must be string <= 500 chars (if present)
+      // createdAt must be server timestamp
+      allow create: if request.auth != null
+                    && request.resource.data.reviewerId == request.auth.uid
+                    && request.resource.data.revieweeId != request.auth.uid
+                    && request.resource.data.rating is int
+                    && request.resource.data.rating >= 1
+                    && request.resource.data.rating <= 5
+                    && (!('reviewText' in request.resource.data)
+                        || request.resource.data.reviewText == null
+                        || (request.resource.data.reviewText is string && request.resource.data.reviewText.size() <= 500))
+                    && request.resource.data.createdAt == request.time;
+
+      // Reviewer can update their review rating / text
+      // Review IDs and timestamps are immutable
+      allow update: if request.auth != null
+                    && resource.data.reviewerId == request.auth.uid
+                    && request.resource.data.reviewerId == resource.data.reviewerId
+                    && request.resource.data.revieweeId == resource.data.revieweeId
+                    && request.resource.data.connectionRequestId == resource.data.connectionRequestId
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && request.resource.data.rating is int
+                    && request.resource.data.rating >= 1
+                    && request.resource.data.rating <= 5
+                    && request.resource.data.updatedAt == request.time;
+
+      // Deletion prevented
+      allow delete: if false;
+    }
+
+    // Safety: User block relationships: blocked_users/{blockId}
+    match /blocked_users/{blockId} {
+      // Authenticated users can read block records involving themselves
+      allow read: if request.auth != null
+                  && (resource.data.blockerId == request.auth.uid || resource.data.blockedUserId == request.auth.uid);
+
+      // Only the blocker can create a block record
+      // Cannot block oneself, createdAt must be server timestamp
+      allow create: if request.auth != null
+                    && request.resource.data.blockerId == request.auth.uid
+                    && request.resource.data.blockedUserId != request.auth.uid
+                    && request.resource.data.createdAt == request.time;
+
+      // Only the blocker can delete / unblock
+      allow delete: if request.auth != null
+                    && resource.data.blockerId == request.auth.uid;
+
+      // Modifications prohibited
+      allow update: if false;
+    }
+
+    // Safety: User reports: reports/{reportId}
+    match /reports/{reportId} {
+      // Normal clients cannot read reports (moderation only)
+      allow read: if false;
+
+      // Authenticated user can submit a report against another user
+      // Cannot report oneself, valid reason, max 500 chars description
+      allow create: if request.auth != null
+                    && request.resource.data.reporterId == request.auth.uid
+                    && request.resource.data.reportedUserId != request.auth.uid
+                    && request.resource.data.reason in ['spam', 'harassment', 'inappropriate_content', 'scam', 'fake_profile', 'other']
+                    && (!('description' in request.resource.data)
+                        || request.resource.data.description == null
+                        || (request.resource.data.description is string && request.resource.data.description.size() <= 500))
+                    && request.resource.data.createdAt == request.time;
+
+      // Reports are immutable and cannot be deleted by users
+      allow update: if false;
       allow delete: if false;
     }
   }

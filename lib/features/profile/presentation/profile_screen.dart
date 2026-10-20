@@ -6,6 +6,8 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../core/widgets/niva_avatar.dart';
 import '../../../core/widgets/niva_button.dart';
 import '../../auth/data/auth_service.dart';
+import '../../safety/data/safety_repository.dart';
+import '../../safety/presentation/widgets/report_sheet.dart';
 
 /// User Profile Screen for NIVA.
 /// Built around two core discovery questions:
@@ -13,7 +15,16 @@ import '../../auth/data/auth_service.dart';
 /// 2. "What can this person help with?"
 /// Strictly non-social-media: no follower counts, likes, or vanity metrics.
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({
+    super.key,
+    this.targetUserId,
+    this.targetUserName,
+    this.safetyRepository,
+  });
+
+  final String? targetUserId;
+  final String? targetUserName;
+  final SafetyRepository? safetyRepository;
 
   static const List<String> _activeNeeds = [
     'Looking for a Java & distributed systems mentor',
@@ -78,6 +89,7 @@ class ProfileScreen extends StatelessWidget {
 
                   // 6. Profile Actions
                   _buildActionsSection(context),
+                  _buildSafetyActions(context),
                   const SizedBox(height: AppSpacing.xxxl),
                 ],
               ),
@@ -257,8 +269,8 @@ class ProfileScreen extends StatelessWidget {
                 icon: Icons.verified_user_outlined,
                 iconColor: AppColors.blue,
                 iconBg: AppColors.infoBg,
-                value: 'Verified',
-                label: 'ID & Phone confirmed',
+                value: '100 Trust',
+                label: 'Community score',
               ),
             ),
           ],
@@ -508,6 +520,14 @@ class ProfileScreen extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.sm),
         _ActionTile(
+          icon: Icons.shield_outlined,
+          title: 'Safety & Reporting',
+          subtitle: 'Community safety, reporting, and blocked user protections',
+          onTap: () =>
+              _showFeedback(context, 'Safety & community protections active'),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _ActionTile(
           icon: Icons.logout_rounded,
           title: 'Sign Out',
           subtitle: 'Log out of your account on this device',
@@ -535,6 +555,88 @@ class ProfileScreen extends StatelessWidget {
         duration: const Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
       ),
+    );
+  }
+
+  Widget _buildSafetyActions(BuildContext context) {
+    final currentUserId = AuthService.instance.currentUser?.uid;
+    if (targetUserId == null || targetUserId == currentUserId) {
+      return const SizedBox.shrink();
+    }
+    final name = targetUserName ?? 'User';
+    final safetyRepo = safetyRepository ?? SafetyRepository();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: AppSpacing.xl),
+        const Text('Safety Actions', style: AppTextStyles.subtitle),
+        const SizedBox(height: AppSpacing.sm),
+        Row(
+          children: [
+            Expanded(
+              child: NivaButton(
+                label: 'Report User',
+                variant: NivaButtonVariant.secondary,
+                onPressed: () {
+                  ReportSheet.show(
+                    context,
+                    reportedUserId: targetUserId!,
+                    reportedUserName: name,
+                    safetyRepository: safetyRepo,
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: NivaButton(
+                label: 'Block User',
+                variant: NivaButtonVariant.secondary,
+                onPressed: () async {
+                  if (currentUserId == null) return;
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      backgroundColor: AppColors.card,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: AppSpacing.borderRadiusLg,
+                      ),
+                      title: Text('Block $name?'),
+                      content: const Text(
+                        'You will no longer see each other in search, matching, or receive new messages.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(false),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.error,
+                            foregroundColor: AppColors.textOnPrimary,
+                          ),
+                          onPressed: () => Navigator.of(ctx).pop(true),
+                          child: const Text('Block'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed == true && context.mounted) {
+                    await safetyRepo.blockUser(
+                      blockerId: currentUserId,
+                      blockedUserId: targetUserId!,
+                    );
+                    if (context.mounted) {
+                      _showFeedback(context, '$name has been blocked.');
+                    }
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

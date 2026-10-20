@@ -4,6 +4,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/widgets/niva_search_bar.dart';
 import '../../auth/data/auth_service.dart';
+import '../../notifications/presentation/notifications_screen.dart';
 import 'widgets/category_grid.dart';
 import 'widgets/home_header.dart';
 import 'widgets/recent_needs_section.dart';
@@ -18,12 +19,14 @@ class HomeScreen extends StatelessWidget {
     this.onCategoryTap,
     this.onAvatarTap,
     this.onCreateNeedTap,
+    this.onNotificationTap,
   });
 
   final VoidCallback? onSearchTap;
   final ValueChanged<String>? onCategoryTap;
   final VoidCallback? onAvatarTap;
   final VoidCallback? onCreateNeedTap;
+  final VoidCallback? onNotificationTap;
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +55,16 @@ class HomeScreen extends StatelessWidget {
                                 .first
                           : 'Arun'),
                 onAvatarTap: onAvatarTap,
+                onNotificationTap:
+                    onNotificationTap ??
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const NotificationsScreen(),
+                        ),
+                      );
+                    },
               ),
               const SizedBox(height: AppSpacing.lg),
               NivaSearchBar(

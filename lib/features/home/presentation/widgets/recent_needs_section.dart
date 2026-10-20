@@ -4,6 +4,8 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/widgets/niva_avatar.dart';
+import '../../../needs/data/need_model.dart';
+import '../../../needs/data/need_repository.dart';
 
 class NeedItem {
   const NeedItem({
@@ -27,13 +29,64 @@ class NeedItem {
   final int responsesCount;
   final Color tagColor;
   final Color tagBg;
+
+  factory NeedItem.fromNeedModel(NeedModel model) {
+    final (color, bg) = _resolveCategoryColors(model.category);
+    return NeedItem(
+      id: model.needId,
+      title: model.title,
+      category: model.category,
+      authorName: model.authorName?.isNotEmpty == true
+          ? model.authorName!
+          : (model.type == 'help' ? 'Helper' : 'Requester'),
+      location: model.location,
+      timeAgo: _formatTimeAgo(model.createdAt),
+      responsesCount: 0,
+      tagColor: color,
+      tagBg: bg,
+    );
+  }
+}
+
+(Color, Color) _resolveCategoryColors(String category) {
+  switch (category.toLowerCase()) {
+    case 'technology':
+    case 'services':
+      return (AppColors.servicesIcon, AppColors.servicesBg);
+    case 'education':
+    case 'information':
+      return (AppColors.infoIcon, AppColors.infoBg);
+    case 'creative':
+    case 'people':
+      return (AppColors.peopleIcon, AppColors.peopleBg);
+    case 'opportunities':
+    case 'career':
+      return (AppColors.opportunitiesIcon, AppColors.opportunitiesBg);
+    case 'communities':
+    case 'hardware':
+      return (AppColors.communitiesIcon, AppColors.communitiesBg);
+    default:
+      return (AppColors.primaryPurple, AppColors.servicesBg);
+  }
+}
+
+String _formatTimeAgo(DateTime? date) {
+  if (date == null) return 'Just now';
+  final diff = DateTime.now().difference(date);
+  if (diff.inSeconds < 60) return 'Just now';
+  if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+  if (diff.inHours < 24) return '${diff.inHours}h ago';
+  if (diff.inDays < 7) return '${diff.inDays}d ago';
+  return '${(diff.inDays / 7).floor()}w ago';
 }
 
 /// Recent needs list on the Home screen with filter chips and compact cards.
+/// Reads real needs from Firestore using pagination-friendly, limited queries.
 class RecentNeedsSection extends StatefulWidget {
-  const RecentNeedsSection({super.key, this.onNeedTap});
+  const RecentNeedsSection({super.key, this.onNeedTap, this.needRepository});
 
   final ValueChanged<NeedItem>? onNeedTap;
+  final NeedRepository? needRepository;
 
   @override
   State<RecentNeedsSection> createState() => _RecentNeedsSectionState();
@@ -43,153 +96,230 @@ class _RecentNeedsSectionState extends State<RecentNeedsSection> {
   int _selectedFilterIndex = 0;
   static const List<String> _filters = ['All', 'Nearby', 'Trending'];
 
-  static const List<NeedItem> _allNeeds = [
-    NeedItem(
-      id: '1',
-      title: 'Need a Java & DSA tutor',
-      category: 'Education',
-      authorName: 'Priya S',
-      location: 'Chennai',
-      timeAgo: '4h ago',
-      responsesCount: 12,
-      tagColor: AppColors.infoIcon,
-      tagBg: AppColors.infoBg,
-    ),
-    NeedItem(
-      id: '2',
-      title: 'Looking for a documentary videographer',
-      category: 'Creative',
-      authorName: 'Alex M',
-      location: 'Bengaluru',
-      timeAgo: '6h ago',
-      responsesCount: 18,
-      tagColor: AppColors.servicesIcon,
-      tagBg: AppColors.servicesBg,
-    ),
-    NeedItem(
-      id: '3',
-      title: 'Need open-source mobile contributors',
-      category: 'Technology',
-      authorName: 'Marcus K',
-      location: 'Remote',
-      timeAgo: '8h ago',
-      responsesCount: 25,
-      tagColor: AppColors.opportunitiesIcon,
-      tagBg: AppColors.opportunitiesBg,
-    ),
-    NeedItem(
-      id: '4',
-      title: 'Advice on university relocation',
-      category: 'Advice',
-      authorName: 'Elena R',
-      location: 'Remote',
-      timeAgo: '10h ago',
-      responsesCount: 31,
-      tagColor: AppColors.peopleIcon,
-      tagBg: AppColors.peopleBg,
-    ),
-  ];
+  late final NeedRepository _needRepository =
+      widget.needRepository ?? NeedRepository();
+
+  bool _isLoading = true;
+  String? _errorMessage;
+  List<NeedItem> _needs = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchRecentNeeds();
+  }
+
+  Future<void> _fetchRecentNeeds() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final models = await _needRepository.getRecentNeeds(limit: 10);
+      if (!mounted) return;
+      setState(() {
+        _needs = models.map(NeedItem.fromNeedModel).toList(growable: false);
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'Unable to load recent needs';
+        _isLoading = false;
+      });
+    }
+  }
 
   List<NeedItem> get _filteredNeeds {
     if (_selectedFilterIndex == 1) {
-      // Nearby sample filter
-      return _allNeeds
-          .where((n) => n.location != 'Remote')
+      return _needs
+          .where((n) => n.location.toLowerCase() != 'remote')
           .toList(growable: false);
     } else if (_selectedFilterIndex == 2) {
-      // Trending sample filter
-      return _allNeeds
-          .where((n) => n.responsesCount >= 20)
-          .toList(growable: false);
+      return _needs.where((n) => n.responsesCount >= 1).toList(growable: false);
     }
-    return _allNeeds;
+    return _needs;
   }
 
   @override
   Widget build(BuildContext context) {
-    final needs = _filteredNeeds;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Section Header
         const Text('Recent Needs', style: AppTextStyles.subtitle),
         const SizedBox(height: AppSpacing.md),
-        // Filter Chips Row
-        SizedBox(
-          height: 38,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            itemCount: _filters.length,
-            separatorBuilder: (context, index) =>
+
+        // 1. Loading State
+        if (_isLoading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
+            child: Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    AppColors.primaryPurple,
+                  ),
+                ),
+              ),
+            ),
+          )
+        // 2. Error State
+        else if (_errorMessage != null)
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: AppSpacing.borderRadiusMd,
+              border: Border.all(color: AppColors.borderSubtle),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.info_outline,
+                  color: AppColors.textTertiary,
+                  size: 20,
+                ),
                 const SizedBox(width: AppSpacing.sm),
-            itemBuilder: (context, index) {
-              final isSelected = _selectedFilterIndex == index;
-              return GestureDetector(
-                onTap: () {
-                  if (_selectedFilterIndex != index) {
-                    setState(() {
-                      _selectedFilterIndex = index;
-                    });
-                  }
-                },
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  constraints: const BoxConstraints(
-                    minWidth: AppSpacing.minTouchTarget,
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.lg,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? AppColors.primaryPurple
-                        : AppColors.card,
-                    borderRadius: AppSpacing.borderRadiusFull,
-                    border: Border.all(
-                      color: isSelected
-                          ? AppColors.primaryPurple
-                          : AppColors.border,
-                      width: 1,
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      _filters[index],
-                      style: AppTextStyles.captionSmall.copyWith(
-                        color: isSelected
-                            ? AppColors.textOnPrimary
-                            : AppColors.textSecondary,
-                        fontWeight: isSelected
-                            ? FontWeight.w600
-                            : FontWeight.w500,
-                        fontSize: 13,
-                      ),
+                Expanded(
+                  child: Text(
+                    _errorMessage!,
+                    style: AppTextStyles.captionSmall.copyWith(
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ),
+                TextButton(
+                  onPressed: _fetchRecentNeeds,
+                  child: const Text(
+                    'Retry',
+                    style: TextStyle(
+                      color: AppColors.primaryPurple,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        // 3. Empty State
+        else if (_needs.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.lg,
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: AppSpacing.borderRadiusLg,
+              border: Border.all(color: AppColors.borderSubtle),
+            ),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.hourglass_empty_rounded,
+                  color: AppColors.textTertiary,
+                  size: 28,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                const Text(
+                  'No recent needs published yet',
+                  style: AppTextStyles.bodyMedium,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Tap the + button below to publish your first need or offer help.',
+                  style: AppTextStyles.captionSmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          )
+        // 4. Content / Filtered List
+        else ...[
+          // Filter Chips Row
+          SizedBox(
+            height: 38,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: _filters.length,
+              separatorBuilder: (context, index) =>
+                  const SizedBox(width: AppSpacing.sm),
+              itemBuilder: (context, index) {
+                final isSelected = _selectedFilterIndex == index;
+                return GestureDetector(
+                  onTap: () {
+                    if (_selectedFilterIndex != index) {
+                      setState(() {
+                        _selectedFilterIndex = index;
+                      });
+                    }
+                  },
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColors.primaryPurple
+                          : AppColors.card,
+                      borderRadius: AppSpacing.borderRadiusFull,
+                      border: Border.all(
+                        color: isSelected
+                            ? AppColors.primaryPurple
+                            : AppColors.border,
+                        width: 1,
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        _filters[index],
+                        style: AppTextStyles.captionSmall.copyWith(
+                          color: isSelected
+                              ? AppColors.textOnPrimary
+                              : AppColors.textSecondary,
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.w500,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          // List of Compact Need Cards
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _filteredNeeds.length,
+            separatorBuilder: (context, index) =>
+                const SizedBox(height: AppSpacing.sm),
+            itemBuilder: (context, index) {
+              final need = _filteredNeeds[index];
+              return _NeedCard(
+                need: need,
+                onTap: () => widget.onNeedTap?.call(need),
               );
             },
           ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        // List of Compact Need Cards
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: needs.length,
-          separatorBuilder: (context, index) =>
-              const SizedBox(height: AppSpacing.sm),
-          itemBuilder: (context, index) {
-            final need = needs[index];
-            return _NeedCard(
-              need: need,
-              onTap: () => widget.onNeedTap?.call(need),
-            );
-          },
-        ),
+        ],
       ],
     );
   }

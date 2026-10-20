@@ -1,0 +1,7 @@
+# Example template for Android release signing
+# Copy this file to android/key.properties and replace with your real keystore credentials.
+# Do NOT commit android/key.properties to version control.
+storePassword=example_store_password
+keyPassword=example_key_password
+keyAlias=upload
+storeFile=upload-keystore.jks

@@ -7,10 +7,16 @@ import '../../../../core/widgets/niva_avatar.dart';
 
 /// Top branding header, greeting, and profile avatar for NIVA Home Screen.
 class HomeHeader extends StatelessWidget {
-  const HomeHeader({super.key, this.userName = 'Arun', this.onAvatarTap});
+  const HomeHeader({
+    super.key,
+    this.userName = 'Arun',
+    this.onAvatarTap,
+    this.onNotificationTap,
+  });
 
   final String userName;
   final VoidCallback? onAvatarTap;
+  final VoidCallback? onNotificationTap;
 
   String _getGreeting() {
     final hour = DateTime.now().hour;
@@ -29,25 +35,53 @@ class HomeHeader extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Text(
-              'NIVA',
-              style: TextStyle(
-                fontFamily: AppTextStyles.fontFamily,
-                fontFamilyFallback: AppTextStyles.fontFallbacks,
-                fontSize: 26,
-                fontWeight: FontWeight.w800,
-                color: AppColors.primaryPurple,
-                letterSpacing: 0.6,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Image.asset(
+                  'assets/images/niva_mark.png',
+                  height: 28,
+                  width: 28,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                const Text(
+                  'NIVA',
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.fontFamily,
+                    fontFamilyFallback: AppTextStyles.fontFallbacks,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primaryPurple,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+              ],
             ),
-            GestureDetector(
-              onTap: onAvatarTap,
-              child: NivaAvatar(
-                name: userName,
-                size: 42,
-                backgroundColor: AppColors.servicesBg,
-                textColor: AppColors.primaryPurple,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(
+                    Icons.notifications_none_rounded,
+                    color: AppColors.textPrimary,
+                    size: 24,
+                  ),
+                  tooltip: 'Notifications',
+                  onPressed: onNotificationTap,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                GestureDetector(
+                  onTap: onAvatarTap,
+                  child: NivaAvatar(
+                    name: userName,
+                    size: 38,
+                    backgroundColor: AppColors.servicesBg,
+                    textColor: AppColors.primaryPurple,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

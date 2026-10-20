@@ -105,16 +105,29 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 children: [
                   const SizedBox(height: AppSpacing.lg),
                   // NIVA Branding & Title
-                  const Text(
-                    'NIVA',
-                    style: TextStyle(
-                      fontFamily: AppTextStyles.fontFamily,
-                      fontFamilyFallback: AppTextStyles.fontFallbacks,
-                      fontSize: 32,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.primaryPurple,
-                      letterSpacing: 0.6,
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Image.asset(
+                        'assets/images/niva_mark.png',
+                        height: 36,
+                        width: 36,
+                        fit: BoxFit.contain,
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      const Text(
+                        'NIVA',
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.fontFamily,
+                          fontFamilyFallback: AppTextStyles.fontFallbacks,
+                          fontSize: 32,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primaryPurple,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   const Text('Create your account', style: AppTextStyles.h2),

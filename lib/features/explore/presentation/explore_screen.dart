@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_colors.dart';
@@ -6,77 +8,33 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../core/widgets/niva_avatar.dart';
 import '../../../core/widgets/niva_button.dart';
 import '../../../core/widgets/niva_search_bar.dart';
+import '../../auth/data/auth_service.dart';
+import '../../connect/data/connection_request_repository.dart';
+import '../../matching/presentation/widgets/matching_sheet.dart';
+import '../../needs/data/need_repository.dart';
+import '../../safety/data/safety_repository.dart';
+import '../data/discovery_model.dart';
+import '../data/search_filter_model.dart';
+import '../data/search_service.dart';
+import 'widgets/filter_bottom_sheet.dart';
 
-/// The 5 core discovery facets supported across NIVA.
-enum DiscoveryType {
-  people,
-  services,
-  information,
-  opportunities,
-  communities;
-
-  String get label => switch (this) {
-    DiscoveryType.people => 'People',
-    DiscoveryType.services => 'Services',
-    DiscoveryType.information => 'Information',
-    DiscoveryType.opportunities => 'Opportunities',
-    DiscoveryType.communities => 'Communities',
-  };
-
-  Color get iconColor => switch (this) {
-    DiscoveryType.people => AppColors.peopleIcon,
-    DiscoveryType.services => AppColors.servicesIcon,
-    DiscoveryType.information => AppColors.infoIcon,
-    DiscoveryType.opportunities => AppColors.opportunitiesIcon,
-    DiscoveryType.communities => AppColors.communitiesIcon,
-  };
-
-  Color get backgroundColor => switch (this) {
-    DiscoveryType.people => AppColors.peopleBg,
-    DiscoveryType.services => AppColors.servicesBg,
-    DiscoveryType.information => AppColors.infoBg,
-    DiscoveryType.opportunities => AppColors.opportunitiesBg,
-    DiscoveryType.communities => AppColors.communitiesBg,
-  };
-
-  IconData get icon => switch (this) {
-    DiscoveryType.people => Icons.person_outline_rounded,
-    DiscoveryType.services => Icons.business_center_outlined,
-    DiscoveryType.information => Icons.menu_book_outlined,
-    DiscoveryType.opportunities => Icons.lightbulb_outline_rounded,
-    DiscoveryType.communities => Icons.groups_outlined,
-  };
-}
-
-/// Model for a universal discovery item in NIVA.
-class DiscoveryModel {
-  const DiscoveryModel({
-    required this.id,
-    required this.title,
-    required this.type,
-    required this.description,
-    required this.location,
-    required this.meta,
-    required this.actionLabel,
-    this.authorName,
-    this.tags = const [],
-  });
-
-  final String id;
-  final String title;
-  final DiscoveryType type;
-  final String description;
-  final String location;
-  final String meta;
-  final String actionLabel;
-  final String? authorName;
-  final List<String> tags;
-}
+export '../data/discovery_model.dart';
 
 /// NIVA Explore Screen — universal discovery space for People, Services,
-/// Information, Opportunities, and Communities.
+/// Information, Opportunities, Communities, and Needs / Help offers.
 class ExploreScreen extends StatefulWidget {
-  const ExploreScreen({super.key});
+  const ExploreScreen({
+    super.key,
+    this.needRepository,
+    this.searchService,
+    this.connectionRequestRepository,
+    this.safetyRepository,
+  });
+
+  final NeedRepository? needRepository;
+  final SearchService? searchService;
+  final ConnectionRequestRepository? connectionRequestRepository;
+  final SafetyRepository? safetyRepository;
 
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
@@ -84,15 +42,29 @@ class ExploreScreen extends StatefulWidget {
 
 class _ExploreScreenState extends State<ExploreScreen> {
   final TextEditingController _searchController = TextEditingController();
+  Timer? _debounceTimer;
+
   String _searchQuery = '';
-  DiscoveryType? _selectedCategory;
+  SearchFilter _searchFilter = SearchFilter.empty;
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  late final SearchService _searchService =
+      widget.searchService ?? SearchService();
+  late final ConnectionRequestRepository _connectionRepo =
+      widget.connectionRequestRepository ?? ConnectionRequestRepository();
+  late final SafetyRepository _safetyRepo =
+      widget.safetyRepository ?? SafetyRepository();
+
+  List<DiscoveryModel> _discoveries = [];
 
   static const List<String> _quickSearchHints = [
     'Java tutor',
     'Laptop repair',
-    'Frontend developer',
+    'React developer',
     'Photography',
     'Remote job',
+    'Graphic designer',
   ];
 
   static const List<String> _trendingTopics = [
@@ -104,341 +76,637 @@ class _ExploreScreenState extends State<ExploreScreen> {
     'RemoteFellowships',
   ];
 
-  static const List<DiscoveryModel> _allDiscoveries = [
-    DiscoveryModel(
-      id: 'd1',
-      title: 'Java & Algorithms Mentorship',
-      type: DiscoveryType.people,
-      authorName: 'Suresh Raina',
-      description: '1-on-1 practical guidance on core Java, concurrency, and technical interview problem solving.',
-      location: 'Chennai',
-      meta: 'Available today',
-      actionLabel: 'Connect',
-      tags: ['Java', 'Mentorship', 'Backend'],
-    ),
-    DiscoveryModel(
-      id: 'd2',
-      title: 'React & Mobile Guild',
-      type: DiscoveryType.communities,
-      description: 'Collaborative global developer collective sharing production code reviews and architecture patterns.',
-      location: 'Remote',
-      meta: '2.8k members',
-      actionLabel: 'Join',
-      tags: ['React', 'Mobile', 'Frontend'],
-    ),
-    DiscoveryModel(
-      id: 'd3',
-      title: 'Open Source Accessibility Tools',
-      type: DiscoveryType.opportunities,
-      description: 'Call for contributors to build open-source assistive mobile components and screen-reader integrations.',
-      location: 'Remote',
-      meta: '6 roles open',
-      actionLabel: 'Contribute',
-      tags: ['Open Source', 'Flutter', 'Accessibility'],
-    ),
-    DiscoveryModel(
-      id: 'd4',
-      title: 'Field Photography & Natural Light Guide',
-      type: DiscoveryType.information,
-      description: 'Curated handbook covering exposure balance, natural lighting portraiture, and lens calibration.',
-      location: 'Curated',
-      meta: '15 min read',
-      actionLabel: 'Read',
-      tags: ['Photography', 'Guide', 'Creative'],
-    ),
-    DiscoveryModel(
-      id: 'd5',
-      title: 'Bengaluru Systems Architecture Roundtable',
-      type: DiscoveryType.communities,
-      description: 'Monthly peer discussions on event-driven backends, distributed systems, and real-time reliability.',
-      location: 'Bengaluru',
-      meta: 'This Saturday',
-      actionLabel: 'RSVP',
-      tags: ['Architecture', 'Meetup', 'Systems'],
-    ),
-    DiscoveryModel(
-      id: 'd6',
-      title: 'Hardware Diagnostics & Board Repair',
-      type: DiscoveryType.services,
-      authorName: 'Ravi Kumar',
-      description: 'Certified component-level motherboard diagnostics, thermal maintenance, and display troubleshooting.',
-      location: 'Chennai',
-      meta: 'Available today',
-      actionLabel: 'Request',
-      tags: ['Laptop repair', 'Hardware', 'Troubleshooting'],
-    ),
-    DiscoveryModel(
-      id: 'd7',
-      title: 'Remote Frontend Engineering Fellowship',
-      type: DiscoveryType.opportunities,
-      description: 'Full-time remote fellowship working alongside senior production engineers on large-scale web apps.',
-      location: 'Remote',
-      meta: 'Active cohort',
-      actionLabel: 'Apply',
-      tags: ['Frontend developer', 'Remote job', 'Engineering'],
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _executeSearch();
+  }
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  void _onCategoryFilterTap(DiscoveryType? type) {
+  /// Debounced search trigger (300ms) to avoid executing queries on every keystroke.
+  void _onSearchChanged(String val) {
+    _debounceTimer?.cancel();
     setState(() {
-      _selectedCategory = (_selectedCategory == type) ? null : type;
+      _searchQuery = val;
+    });
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      _executeSearch();
     });
   }
 
+  void _onSearchSubmitted(String val) {
+    _debounceTimer?.cancel();
+    setState(() {
+      _searchQuery = val;
+    });
+    _executeSearch();
+  }
+
+  void _clearSearchText() {
+    _debounceTimer?.cancel();
+    _searchController.clear();
+    setState(() {
+      _searchQuery = '';
+    });
+    _executeSearch();
+  }
+
+  Future<void> _executeSearch() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final currentUid = AuthService.instance.currentUser?.uid;
+      Set<String> blockedIds = const {};
+      if (currentUid != null) {
+        blockedIds = await _safetyRepo.getBlockedUserIds(currentUid);
+      }
+
+      final results = await _searchService.searchDiscoveries(
+        query: _searchQuery,
+        filter: _searchFilter,
+        blockedUserIds: blockedIds,
+        limit: 30,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _discoveries = results;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'Could not load search results. Please try again.';
+        _isLoading = false;
+      });
+      debugPrint('ExploreScreen._executeSearch error: $e');
+    }
+  }
+
+  void _onCategoryFilterTap(DiscoveryType? type) {
+    final newCategory = (_searchFilter.category == type) ? null : type;
+    setState(() {
+      _searchFilter = _searchFilter.copyWith(category: () => newCategory);
+    });
+    _executeSearch();
+  }
+
   void _applyQuickSearch(String term) {
+    _debounceTimer?.cancel();
     setState(() {
       _searchController.text = term;
       _searchQuery = term;
     });
+    _executeSearch();
   }
 
   void _clearFilters() {
+    _debounceTimer?.cancel();
     setState(() {
       _searchController.clear();
       _searchQuery = '';
-      _selectedCategory = null;
+      _searchFilter = SearchFilter.empty;
     });
+    _executeSearch();
   }
 
-  List<DiscoveryModel> get _filteredDiscoveries {
-    return _allDiscoveries
-        .where((item) {
-          if (_selectedCategory != null && item.type != _selectedCategory) {
-            return false;
-          }
-          if (_searchQuery.trim().isNotEmpty) {
-            final query = _searchQuery.toLowerCase();
-            final matchTitle = item.title.toLowerCase().contains(query);
-            final matchDesc = item.description.toLowerCase().contains(query);
-            final matchTags = item.tags.any(
-              (t) => t.toLowerCase().contains(query),
-            );
-            final matchType = item.type.label.toLowerCase().contains(query);
-            final matchLoc = item.location.toLowerCase().contains(query);
-            return matchTitle ||
-                matchDesc ||
-                matchTags ||
-                matchType ||
-                matchLoc;
-          }
-          return true;
-        })
-        .toList(growable: false);
+  void _openFilterBottomSheet() {
+    FilterBottomSheet.show(
+      context,
+      currentFilter: _searchFilter,
+      onApply: (updated) {
+        setState(() {
+          _searchFilter = updated;
+        });
+        _executeSearch();
+      },
+    );
+  }
+
+  void _handleItemAction(DiscoveryModel item) {
+    // 1. If it's a Need: proceed to Matching Sheet
+    if (item.needModel != null && item.needModel!.type == 'need') {
+      MatchingSheet.show(context, need: item.needModel!);
+      return;
+    }
+
+    // 2. If it's a Help Offer or Helper Profile: handle Connect
+    if (item.itemType == 'help' || item.type == DiscoveryType.people) {
+      _showConnectPrompt(item);
+      return;
+    }
+
+    // 3. Fallback discovery dialog/snackbar
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Exploring ${item.title}...'),
+        duration: const Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _showConnectPrompt(DiscoveryModel item) async {
+    final currentUid = AuthService.instance.currentUser?.uid;
+    if (currentUid == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please log in to send a connect request.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (item.authorId == currentUid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You cannot send a connection request to yourself.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final targetName = item.authorName ?? item.title;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.card,
+        shape: RoundedRectangleBorder(borderRadius: AppSpacing.borderRadiusLg),
+        title: Text('Connect with $targetName?', style: AppTextStyles.subtitle),
+        content: Text(
+          'Send a connection request to collaborate or receive help for this discovery.',
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryPurple,
+              foregroundColor: AppColors.textOnPrimary,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Send Request'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        final toUid = item.authorId ?? item.id;
+        final needId = item.needModel?.needId ?? item.id;
+        await _connectionRepo.sendConnectRequest(
+          fromUserId: currentUid,
+          toUserId: toUid,
+          needId: needId,
+        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Connection request sent to $targetName!'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not send request: $e'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final discoveries = _filteredDiscoveries;
     final isFiltering =
-        _searchQuery.trim().isNotEmpty || _selectedCategory != null;
+        _searchQuery.trim().isNotEmpty || _searchFilter.hasActiveFilters;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.screenHorizontal,
-            vertical: AppSpacing.md,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. Header
-              const Text('Explore', style: AppTextStyles.h1),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'Discover people, knowledge, opportunities and more.',
-                style: AppTextStyles.caption.copyWith(
-                  color: AppColors.textSecondary,
-                  fontSize: 15,
+        child: RefreshIndicator(
+          onRefresh: _executeSearch,
+          color: AppColors.primaryPurple,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.screenHorizontal,
+              vertical: AppSpacing.md,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1. Header
+                const Text('Explore', style: AppTextStyles.h1),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'Discover people, knowledge, opportunities and more.',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textSecondary,
+                    fontSize: 15,
+                  ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.lg),
 
-              // 2. Search
-              NivaSearchBar(
-                controller: _searchController,
-                hintText: 'Search anything...',
-                onChanged: (val) {
-                  setState(() {
-                    _searchQuery = val;
-                  });
-                },
-                onSubmitted: (val) {
-                  setState(() {
-                    _searchQuery = val;
-                  });
-                },
-              ),
-              const SizedBox(height: AppSpacing.md),
+                // 2. Search & Filter Bar
+                NivaSearchBar(
+                  controller: _searchController,
+                  hintText: 'Search anything...',
+                  onChanged: _onSearchChanged,
+                  onSubmitted: _onSearchSubmitted,
+                  onClear: _clearSearchText,
+                  onFilterTap: _openFilterBottomSheet,
+                  hasActiveFilters: _searchFilter.hasActiveFilters,
+                  filterCount: _searchFilter.activeFiltersCount,
+                ),
+                const SizedBox(height: AppSpacing.md),
 
-              // Quick Search Examples
-              SizedBox(
-                height: 34,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  itemCount: _quickSearchHints.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(width: AppSpacing.sm),
-                  itemBuilder: (context, index) {
-                    final hint = _quickSearchHints[index];
-                    final isSelected =
-                        _searchQuery.toLowerCase() == hint.toLowerCase();
-                    return GestureDetector(
-                      onTap: () => _applyQuickSearch(hint),
-                      behavior: HitTestBehavior.opaque,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.md,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? AppColors.primaryPurple
-                              : AppColors.card,
-                          borderRadius: AppSpacing.borderRadiusFull,
-                          border: Border.all(
+                // Active Filter Chips (shown when filters are applied)
+                if (_searchFilter.hasActiveFilters) ...[
+                  _ActiveFilterChipsRow(
+                    filter: _searchFilter,
+                    onRemoveCategory: () {
+                      setState(() {
+                        _searchFilter = _searchFilter.copyWith(
+                          category: () => null,
+                        );
+                      });
+                      _executeSearch();
+                    },
+                    onRemoveType: () {
+                      setState(() {
+                        _searchFilter = _searchFilter.copyWith(
+                          type: () => null,
+                        );
+                      });
+                      _executeSearch();
+                    },
+                    onRemoveLocation: () {
+                      setState(() {
+                        _searchFilter = _searchFilter.copyWith(
+                          location: () => null,
+                        );
+                      });
+                      _executeSearch();
+                    },
+                    onRemoveAvailability: () {
+                      setState(() {
+                        _searchFilter = _searchFilter.copyWith(
+                          availability: () => null,
+                        );
+                      });
+                      _executeSearch();
+                    },
+                    onResetSort: () {
+                      setState(() {
+                        _searchFilter = _searchFilter.copyWith(
+                          sortBy: SearchSortBy.relevance,
+                        );
+                      });
+                      _executeSearch();
+                    },
+                    onClearAll: _clearFilters,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                ],
+
+                // Quick Search Suggestions
+                SizedBox(
+                  height: 34,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: _quickSearchHints.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(width: AppSpacing.sm),
+                    itemBuilder: (context, index) {
+                      final hint = _quickSearchHints[index];
+                      final isSelected =
+                          _searchQuery.toLowerCase() == hint.toLowerCase();
+                      return GestureDetector(
+                        onTap: () => _applyQuickSearch(hint),
+                        behavior: HitTestBehavior.opaque,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
                             color: isSelected
                                 ? AppColors.primaryPurple
-                                : AppColors.border,
-                            width: 1,
-                          ),
-                        ),
-                        child: Center(
-                          child: Text(
-                            hint,
-                            style: AppTextStyles.captionSmall.copyWith(
+                                : AppColors.card,
+                            borderRadius: AppSpacing.borderRadiusFull,
+                            border: Border.all(
                               color: isSelected
-                                  ? AppColors.textOnPrimary
-                                  : AppColors.textSecondary,
-                              fontWeight: isSelected
-                                  ? FontWeight.w600
-                                  : FontWeight.w500,
-                              fontSize: 12,
+                                  ? AppColors.primaryPurple
+                                  : AppColors.border,
+                              width: 1,
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              hint,
+                              style: AppTextStyles.captionSmall.copyWith(
+                                color: isSelected
+                                    ? AppColors.textOnPrimary
+                                    : AppColors.textSecondary,
+                                fontWeight: isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.w500,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
+                const SizedBox(height: AppSpacing.xl),
 
-              // 3. Discovery Categories Filter Row
-              _CategoryFilterRow(
-                selectedType: _selectedCategory,
-                onSelectType: _onCategoryFilterTap,
-              ),
-              const SizedBox(height: AppSpacing.xxl),
+                // 3. Discovery Categories Filter Row
+                _CategoryFilterRow(
+                  selectedType: _searchFilter.category,
+                  onSelectType: _onCategoryFilterTap,
+                ),
+                const SizedBox(height: AppSpacing.xxl),
 
-              // 4. Suggested Discoveries / Search Results
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
+                // 4. Discoveries Header & Result Count
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      isFiltering
+                          ? 'Discovery Results (${_discoveries.length})'
+                          : 'Suggested Discoveries',
+                      style: AppTextStyles.subtitle,
+                    ),
+                    if (isFiltering)
+                      TextButton(
+                        onPressed: _clearFilters,
+                        child: const Text('Reset'),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.sm),
+
+                // Error State + Retry
+                if (_errorMessage != null)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: AppColors.errorLight,
+                      borderRadius: AppSpacing.borderRadiusMd,
+                      border: Border.all(color: AppColors.error),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.error_outline_rounded,
+                          color: AppColors.error,
+                          size: 20,
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Text(
+                            _errorMessage!,
+                            style: AppTextStyles.caption.copyWith(
+                              color: AppColors.error,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _executeSearch,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                // Loading State
+                if (_isLoading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: AppSpacing.xxl),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primaryPurple,
+                        strokeWidth: 2.5,
+                      ),
+                    ),
+                  )
+                else if (_discoveries.isEmpty)
+                  _EmptyDiscoveryState(onClear: _clearFilters)
+                else
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _discoveries.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: AppSpacing.md),
+                    itemBuilder: (context, index) {
+                      return _DiscoveryCard(
+                        item: _discoveries[index],
+                        onTap: () => _handleItemAction(_discoveries[index]),
+                      );
+                    },
+                  ),
+
+                // 5. Trending / Popular Topics (shown when not actively searching)
+                if (!isFiltering) ...[
+                  const SizedBox(height: AppSpacing.xxl),
+                  const Text('Trending Topics', style: AppTextStyles.subtitle),
+                  const SizedBox(height: AppSpacing.xs),
                   Text(
-                    isFiltering
-                        ? 'Discovery Results (${discoveries.length})'
-                        : 'Suggested Discoveries',
+                    'Useful discovery areas gaining traction',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    children: _trendingTopics
+                        .map((topic) {
+                          return ActionChip(
+                            label: Text('#$topic'),
+                            labelStyle: AppTextStyles.captionSmall.copyWith(
+                              color: AppColors.primaryPurple,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            backgroundColor: AppColors.servicesBg,
+                            side: BorderSide.none,
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: AppSpacing.borderRadiusFull,
+                            ),
+                            onPressed: () => _applyQuickSearch(topic),
+                          );
+                        })
+                        .toList(growable: false),
+                  ),
+                  const SizedBox(height: AppSpacing.xxl),
+
+                  // 6. Nearby / Regional Discoveries Section
+                  const Text(
+                    'Nearby & Regional',
                     style: AppTextStyles.subtitle,
                   ),
-                  if (isFiltering)
-                    TextButton(
-                      onPressed: _clearFilters,
-                      child: const Text('Reset'),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    'Discoveries within your broader region',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
                     ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _RegionalBanner(onTap: () => _applyQuickSearch('Chennai')),
+                  const SizedBox(height: AppSpacing.xxxl),
                 ],
-              ),
-              const SizedBox(height: AppSpacing.sm),
-
-              if (discoveries.isEmpty)
-                _EmptyDiscoveryState(onClear: _clearFilters)
-              else
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: discoveries.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: AppSpacing.md),
-                  itemBuilder: (context, index) {
-                    return _DiscoveryCard(
-                      item: discoveries[index],
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Exploring ${discoveries[index].title}...',
-                            ),
-                            duration: const Duration(seconds: 1),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
-
-              // 5. Trending / Popular Topics (shown when not actively searching)
-              if (!isFiltering) ...[
-                const SizedBox(height: AppSpacing.xxl),
-                const Text('Trending Topics', style: AppTextStyles.subtitle),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  'Useful discovery areas gaining traction',
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Wrap(
-                  spacing: AppSpacing.sm,
-                  runSpacing: AppSpacing.sm,
-                  children: _trendingTopics
-                      .map((topic) {
-                        return ActionChip(
-                          label: Text('#$topic'),
-                          labelStyle: AppTextStyles.captionSmall.copyWith(
-                            color: AppColors.primaryPurple,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          backgroundColor: AppColors.servicesBg,
-                          side: BorderSide.none,
-                          shape: const RoundedRectangleBorder(
-                            borderRadius: AppSpacing.borderRadiusFull,
-                          ),
-                          onPressed: () => _applyQuickSearch(topic),
-                        );
-                      })
-                      .toList(growable: false),
-                ),
-                const SizedBox(height: AppSpacing.xxl),
-
-                // 6. Nearby / Regional Discoveries Section
-                const Text('Nearby & Regional', style: AppTextStyles.subtitle),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  'Discoveries within your broader region',
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                _RegionalBanner(onTap: () => _applyQuickSearch('Chennai')),
-                const SizedBox(height: AppSpacing.xxxl),
               ],
-            ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Horizontal list of active filter chips with individual dismiss handlers.
+class _ActiveFilterChipsRow extends StatelessWidget {
+  const _ActiveFilterChipsRow({
+    required this.filter,
+    required this.onRemoveCategory,
+    required this.onRemoveType,
+    required this.onRemoveLocation,
+    required this.onRemoveAvailability,
+    required this.onResetSort,
+    required this.onClearAll,
+  });
+
+  final SearchFilter filter;
+  final VoidCallback onRemoveCategory;
+  final VoidCallback onRemoveType;
+  final VoidCallback onRemoveLocation;
+  final VoidCallback onRemoveAvailability;
+  final VoidCallback onResetSort;
+  final VoidCallback onClearAll;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 32,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        children: [
+          if (filter.category != null)
+            _ActiveChip(
+              label: 'Category: ${filter.category!.label}',
+              onDeleted: onRemoveCategory,
+            ),
+          if (filter.type != null && filter.type!.isNotEmpty)
+            _ActiveChip(
+              label: 'Type: ${filter.type == 'need' ? 'I Need' : 'I Can Help'}',
+              onDeleted: onRemoveType,
+            ),
+          if (filter.location != null &&
+              filter.location!.trim().isNotEmpty &&
+              filter.location!.toLowerCase() != 'all')
+            _ActiveChip(
+              label: 'Location: ${filter.location}',
+              onDeleted: onRemoveLocation,
+            ),
+          if (filter.availability != null &&
+              filter.availability!.trim().isNotEmpty &&
+              filter.availability!.toLowerCase() != 'any')
+            _ActiveChip(
+              label: 'Availability: ${filter.availability}',
+              onDeleted: onRemoveAvailability,
+            ),
+          if (filter.sortBy != SearchSortBy.relevance)
+            _ActiveChip(
+              label: 'Sort: ${filter.sortBy.label}',
+              onDeleted: onResetSort,
+            ),
+          Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: ActionChip(
+              label: const Text('Clear All'),
+              labelStyle: AppTextStyles.captionSmall.copyWith(
+                color: AppColors.error,
+                fontWeight: FontWeight.w600,
+                fontSize: 11.5,
+              ),
+              backgroundColor: AppColors.errorLight,
+              side: const BorderSide(color: AppColors.error),
+              shape: const RoundedRectangleBorder(
+                borderRadius: AppSpacing.borderRadiusFull,
+              ),
+              onPressed: onClearAll,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActiveChip extends StatelessWidget {
+  const _ActiveChip({required this.label, required this.onDeleted});
+
+  final String label;
+  final VoidCallback onDeleted;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: AppSpacing.sm),
+      child: Chip(
+        label: Text(label),
+        labelStyle: AppTextStyles.captionSmall.copyWith(
+          color: AppColors.primaryPurple,
+          fontWeight: FontWeight.w600,
+          fontSize: 11.5,
+        ),
+        deleteIcon: const Icon(
+          Icons.close_rounded,
+          size: 14,
+          color: AppColors.primaryPurple,
+        ),
+        onDeleted: onDeleted,
+        backgroundColor: AppColors.servicesBg,
+        side: const BorderSide(color: AppColors.secondaryPurple, width: 0.8),
+        shape: const RoundedRectangleBorder(
+          borderRadius: AppSpacing.borderRadiusFull,
+        ),
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
       ),
     );
   }
@@ -562,6 +830,11 @@ class _DiscoveryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasItemTypeBadge = item.itemType == 'need' || item.itemType == 'help';
+    final itemTypeBadgeLabel = item.itemType == 'need'
+        ? 'I Need'
+        : 'I Can Help';
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.card,
@@ -578,38 +851,68 @@ class _DiscoveryCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top Row: Solution Type Badge + Meta/Location
+                // Top Row: Category Type Badge + Optional Need/Help Badge + Meta/Location
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: item.type.backgroundColor,
-                        borderRadius: AppSpacing.borderRadiusSm,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            item.type.icon,
-                            color: item.type.iconColor,
-                            size: 14,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            item.type.label,
-                            style: AppTextStyles.captionSmall.copyWith(
-                              color: item.type.iconColor,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 11.5,
+                          decoration: BoxDecoration(
+                            color: item.type.backgroundColor,
+                            borderRadius: AppSpacing.borderRadiusSm,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                item.type.icon,
+                                color: item.type.iconColor,
+                                size: 14,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                item.type.label,
+                                style: AppTextStyles.captionSmall.copyWith(
+                                  color: item.type.iconColor,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 11.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (hasItemTypeBadge) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: item.itemType == 'need'
+                                  ? AppColors.errorLight
+                                  : AppColors.successLight,
+                              borderRadius: AppSpacing.borderRadiusSm,
+                            ),
+                            child: Text(
+                              itemTypeBadgeLabel,
+                              style: AppTextStyles.captionSmall.copyWith(
+                                color: item.itemType == 'need'
+                                    ? AppColors.error
+                                    : AppColors.success,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 10.5,
+                              ),
                             ),
                           ),
                         ],
-                      ),
+                      ],
                     ),
                     Text(
                       '${item.location} • ${item.meta}',
@@ -643,7 +946,7 @@ class _DiscoveryCard extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.md),
 
-                // Bottom Row: Tag Pills & Action CTA
+                // Bottom Row: Author + Trust Score & Action Button
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -665,6 +968,38 @@ class _DiscoveryCard extends StatelessWidget {
                               color: AppColors.textPrimary,
                             ),
                           ),
+                          if (item.trustScore != null) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.servicesBg,
+                                borderRadius: AppSpacing.borderRadiusSm,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.shield_outlined,
+                                    size: 11,
+                                    color: AppColors.primaryPurple,
+                                  ),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    '${item.trustScore}',
+                                    style: AppTextStyles.captionSmall.copyWith(
+                                      color: AppColors.primaryPurple,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 10.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ],
                       )
                     else if (item.tags.isNotEmpty)
@@ -751,7 +1086,7 @@ class _EmptyDiscoveryState extends StatelessWidget {
           const Text('No discoveries found', style: AppTextStyles.subtitle),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            'Try searching for other terms like "Java", "Mentor", or "Open Source".',
+            'Try adjusting your search terms or clearing some active filters.',
             textAlign: TextAlign.center,
             style: AppTextStyles.caption.copyWith(
               color: AppColors.textSecondary,

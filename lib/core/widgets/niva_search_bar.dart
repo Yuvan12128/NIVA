@@ -14,6 +14,10 @@ class NivaSearchBar extends StatelessWidget {
     this.onTap,
     this.onChanged,
     this.onSubmitted,
+    this.onClear,
+    this.onFilterTap,
+    this.hasActiveFilters = false,
+    this.filterCount = 0,
     this.readOnly = false,
     this.autofocus = false,
   });
@@ -23,6 +27,10 @@ class NivaSearchBar extends StatelessWidget {
   final VoidCallback? onTap;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
+  final VoidCallback? onClear;
+  final VoidCallback? onFilterTap;
+  final bool hasActiveFilters;
+  final int filterCount;
   final bool readOnly;
   final bool autofocus;
 
@@ -92,6 +100,61 @@ class NivaSearchBar extends StatelessWidget {
                           ),
                         ),
                 ),
+                // Optional Clear Button
+                if (onClear != null && (controller?.text.isNotEmpty ?? false))
+                  IconButton(
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      size: 20,
+                      color: AppColors.textTertiary,
+                    ),
+                    tooltip: 'Clear search',
+                    onPressed: onClear,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
+                  ),
+                // Optional Filter Button
+                if (onFilterTap != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            Icons.tune_rounded,
+                            size: 22,
+                            color: hasActiveFilters
+                                ? AppColors.primaryPurple
+                                : AppColors.textSecondary,
+                          ),
+                          tooltip: 'Filter results',
+                          onPressed: onFilterTap,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 38,
+                            minHeight: 38,
+                          ),
+                        ),
+                        if (hasActiveFilters)
+                          Positioned(
+                            top: 6,
+                            right: 6,
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: AppColors.primaryPurple,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 // Circular Purple Search / Discovery Action Button
                 Semantics(
                   button: true,
