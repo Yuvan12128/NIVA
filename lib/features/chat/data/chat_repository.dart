@@ -96,6 +96,7 @@ class ChatRepository {
   }
 
   /// Fetch list of chats for the user (one-shot query with limit).
+  /// Safe query avoiding composite index requirements by sorting in memory.
   Future<List<ChatModel>> getUserChats(String userId, {int limit = 20}) async {
     if (userId.isEmpty) return const [];
     final col = _chatsCollection;
@@ -104,41 +105,28 @@ class ChatRepository {
     try {
       final snapshot = await col
           .where('participantIds', arrayContains: userId)
-          .orderBy('updatedAt', descending: true)
           .limit(limit)
           .get();
 
-      return snapshot.docs
+      final chats = snapshot.docs
           .map((doc) => ChatModel.fromMap(doc.id, doc.data()))
-          .toList(growable: false);
+          .toList();
+
+      chats.sort((a, b) {
+        final tA = a.updatedAt ?? a.createdAt ?? DateTime(2000);
+        final tB = b.updatedAt ?? b.createdAt ?? DateTime(2000);
+        return tB.compareTo(tA);
+      });
+
+      return chats;
     } catch (e) {
-      // Fallback query if composite index is pending
-      try {
-        final fallbackSnapshot = await col
-            .where('participantIds', arrayContains: userId)
-            .limit(limit)
-            .get();
-
-        final chats = fallbackSnapshot.docs
-            .map((doc) => ChatModel.fromMap(doc.id, doc.data()))
-            .toList();
-
-        chats.sort((a, b) {
-          final tA = a.updatedAt ?? a.createdAt ?? DateTime(2000);
-          final tB = b.updatedAt ?? b.createdAt ?? DateTime(2000);
-          return tB.compareTo(tA);
-        });
-
-        return chats;
-      } catch (fallbackError) {
-        debugPrint('ChatRepository.getUserChats error: $fallbackError');
-        return const [];
-      }
+      debugPrint('ChatRepository.getUserChats error: $e');
+      return const [];
     }
   }
 
   /// Real-time stream of messages ONLY for the active conversation.
-  /// Uses a strict query limit (default: 40 messages) with reverse ordering.
+  /// Bounded query avoiding composite index requirements by sorting in memory.
   Stream<List<MessageModel>> streamMessages(String chatId, {int limit = 40}) {
     if (chatId.isEmpty) return Stream.value(const []);
     final col = _messagesCollection;
@@ -147,20 +135,21 @@ class ChatRepository {
     try {
       return col
           .where('chatId', isEqualTo: chatId)
-          .orderBy('createdAt', descending: true)
           .limit(limit)
           .snapshots()
-          .map(
-            (snapshot) => snapshot.docs
+          .map((snapshot) {
+            final list = snapshot.docs
                 .map((doc) => MessageModel.fromMap(doc.id, doc.data()))
-                .toList(growable: false),
-          )
-          .handleError((dynamic error) {
-            debugPrint('ChatRepository.streamMessages error: $error');
-            return const <MessageModel>[];
+                .toList();
+            list.sort((a, b) {
+              final tA = a.createdAt ?? DateTime(2000);
+              final tB = b.createdAt ?? DateTime(2000);
+              return tB.compareTo(tA);
+            });
+            return list;
           });
     } catch (e) {
-      debugPrint('ChatRepository.streamMessages fallback notice: $e');
+      debugPrint('ChatRepository.streamMessages error: $e');
       return Stream.value(const []);
     }
   }
