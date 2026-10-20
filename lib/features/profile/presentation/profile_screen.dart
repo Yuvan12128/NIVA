@@ -8,31 +8,45 @@ import '../../../core/widgets/niva_button.dart';
 import '../../auth/data/auth_service.dart';
 import '../../safety/data/safety_repository.dart';
 import '../../safety/presentation/widgets/report_sheet.dart';
+import '../../user/data/user_model.dart';
+import '../../user/data/user_repository.dart';
+import 'widgets/edit_profile_sheet.dart';
 
 /// User Profile Screen for NIVA.
 /// Built around two core discovery questions:
 /// 1. "What does this person need?"
 /// 2. "What can this person help with?"
 /// Strictly non-social-media: no follower counts, likes, or vanity metrics.
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
     super.key,
     this.targetUserId,
     this.targetUserName,
     this.safetyRepository,
+    this.userRepository,
   });
 
   final String? targetUserId;
   final String? targetUserName;
   final SafetyRepository? safetyRepository;
+  final UserRepository? userRepository;
 
-  static const List<String> _activeNeeds = [
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  late final UserRepository _userRepo =
+      widget.userRepository ?? UserRepository();
+  UserModel? _userProfile;
+
+  static const List<String> _defaultActiveNeeds = [
     'Looking for a Java & distributed systems mentor',
     'Looking for a photographer for local tech meetup',
     'Looking for a React & Flutter contributor community',
   ];
 
-  static const List<String> _helpCapabilities = [
+  static const List<String> _defaultHelpCapabilities = [
     'Java',
     'React',
     'Flutter',
@@ -41,7 +55,103 @@ class ProfileScreen extends StatelessWidget {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final uid = widget.targetUserId ?? AuthService.instance.currentUser?.uid;
+    if (uid != null && uid.isNotEmpty) {
+      try {
+        final profile = await _userRepo.getUserProfile(uid);
+        if (mounted && profile != null) {
+          setState(() {
+            _userProfile = profile;
+          });
+        }
+      } catch (e) {
+        debugPrint('ProfileScreen._loadProfile notice: $e');
+      }
+    }
+  }
+
+  Future<void> _openEditProfile() async {
+    final currentUser = AuthService.instance.currentUser;
+    final fallbackName = currentUser?.displayName?.isNotEmpty == true
+        ? currentUser!.displayName!
+        : (currentUser?.email?.isNotEmpty == true
+              ? currentUser!.email!.split('@').first
+              : 'Arun Kumar');
+
+    final baseUser = _userProfile ?? UserModel(
+      uid: currentUser?.uid ?? '',
+      name: fallbackName,
+      city: 'Chennai',
+      language: 'English, Tamil',
+      skills: _defaultHelpCapabilities,
+      canHelpWith: _defaultHelpCapabilities,
+      lookingFor: _defaultActiveNeeds,
+      availability: 'Available',
+    );
+
+    final updated = await EditProfileSheet.show(
+      context,
+      user: baseUser,
+      userRepository: _userRepo,
+    );
+
+    if (updated != null && mounted) {
+      setState(() {
+        _userProfile = updated;
+      });
+    }
+  }
+
+  void _showFeedback(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final currentUser = AuthService.instance.currentUser;
+    final fallbackName = currentUser?.displayName?.isNotEmpty == true
+        ? currentUser!.displayName!
+        : (currentUser?.email != null
+              ? currentUser!.email!.split('@').first
+              : 'Arun Kumar');
+
+    final displayName = _userProfile?.name.isNotEmpty == true
+        ? _userProfile!.name
+        : (widget.targetUserName ?? fallbackName);
+
+    final city = _userProfile?.city.isNotEmpty == true
+        ? _userProfile!.city
+        : 'Chennai (Remote flexible)';
+
+    final language = _userProfile?.language.isNotEmpty == true
+        ? _userProfile!.language
+        : 'English, Tamil';
+
+    final availability = _userProfile?.availability.isNotEmpty == true
+        ? _userProfile!.availability
+        : 'Available for discovery';
+
+    final activeNeeds = _userProfile?.lookingFor.isNotEmpty == true
+        ? _userProfile!.lookingFor
+        : _defaultActiveNeeds;
+
+    final helpCapabilities = _userProfile?.canHelpWith.isNotEmpty == true
+        ? _userProfile!.canHelpWith
+        : (_userProfile?.skills.isNotEmpty == true
+              ? _userProfile!.skills
+              : _defaultHelpCapabilities);
+
+    final isOwnProfile = widget.targetUserId == null ||
+        widget.targetUserId == currentUser?.uid;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -68,7 +178,13 @@ class ProfileScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 1. Header
-                  _buildHeader(context),
+                  _buildHeader(
+                    context,
+                    displayName: displayName,
+                    city: city,
+                    language: language,
+                    isOwnProfile: isOwnProfile,
+                  ),
                   const SizedBox(height: AppSpacing.xl),
 
                   // 2. Trust Indicators (Non-vanity)
@@ -76,20 +192,20 @@ class ProfileScreen extends StatelessWidget {
                   const SizedBox(height: AppSpacing.xl),
 
                   // 3. Availability
-                  _buildAvailabilitySection(),
+                  _buildAvailabilitySection(availability: availability),
                   const SizedBox(height: AppSpacing.xl),
 
                   // 4. I Need (Active Needs)
-                  _buildNeedsSection(context),
+                  _buildNeedsSection(context, activeNeeds: activeNeeds),
                   const SizedBox(height: AppSpacing.xl),
 
                   // 5. I Can Help (Capabilities)
-                  _buildHelpSection(context),
+                  _buildHelpSection(context, capabilities: helpCapabilities),
                   const SizedBox(height: AppSpacing.xl),
 
                   // 6. Profile Actions
-                  _buildActionsSection(context),
-                  _buildSafetyActions(context),
+                  _buildActionsSection(context, isOwnProfile: isOwnProfile),
+                  _buildSafetyActions(context, isOwnProfile: isOwnProfile),
                   const SizedBox(height: AppSpacing.xxxl),
                 ],
               ),
@@ -101,14 +217,13 @@ class ProfileScreen extends StatelessWidget {
   }
 
   // 1. HEADER
-  Widget _buildHeader(BuildContext context) {
-    final currentUser = AuthService.instance.currentUser;
-    final displayName = currentUser?.displayName?.isNotEmpty == true
-        ? currentUser!.displayName!
-        : (currentUser?.email != null
-              ? currentUser!.email!.split('@').first
-              : 'Arun Kumar');
-
+  Widget _buildHeader(
+    BuildContext context, {
+    required String displayName,
+    required String city,
+    required String language,
+    required bool isOwnProfile,
+  }) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
@@ -153,7 +268,7 @@ class ProfileScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Mobile engineer & discovery explorer',
+                      'Community Member & Discovery Explorer',
                       style: AppTextStyles.caption.copyWith(
                         color: AppColors.textSecondary,
                         fontSize: 13.5,
@@ -170,7 +285,7 @@ class ProfileScreen extends StatelessWidget {
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            'Chennai (Remote flexible)',
+                            city,
                             style: AppTextStyles.captionSmall.copyWith(
                               color: AppColors.textTertiary,
                             ),
@@ -191,7 +306,7 @@ class ProfileScreen extends StatelessWidget {
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            'English, Tamil',
+                            language,
                             style: AppTextStyles.captionSmall.copyWith(
                               color: AppColors.textTertiary,
                             ),
@@ -208,7 +323,7 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
-            'Building accessible tools. Currently exploring distributed systems and always happy to help beginners with Flutter and frontend architecture.',
+            'Building accessible tools, collaborating on needs, and connecting with community peers across NIVA.',
             style: AppTextStyles.bodyMedium.copyWith(
               color: AppColors.textPrimary,
               height: 1.45,
@@ -216,14 +331,14 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
-          NivaButton(
-            label: 'Edit Profile',
-            variant: NivaButtonVariant.secondary,
-            isFullWidth: true,
-            icon: const Icon(Icons.edit_outlined, size: 18),
-            onPressed: () =>
-                _showFeedback(context, 'Edit profile form opening...'),
-          ),
+          if (isOwnProfile)
+            NivaButton(
+              label: 'Edit Profile',
+              variant: NivaButtonVariant.secondary,
+              isFullWidth: true,
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              onPressed: _openEditProfile,
+            ),
         ],
       ),
     );
@@ -231,6 +346,7 @@ class ProfileScreen extends StatelessWidget {
 
   // 2. TRUST SECTION (Useful trust indicators only)
   Widget _buildTrustSection() {
+    final trustScore = _userProfile?.trustScore ?? 100;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -277,7 +393,7 @@ class ProfileScreen extends StatelessWidget {
                 icon: Icons.verified_user_outlined,
                 iconColor: AppColors.blue,
                 iconBg: AppColors.infoBg,
-                value: '100 Trust',
+                value: '$trustScore Trust',
                 label: 'Community score',
               ),
             ),
@@ -288,7 +404,7 @@ class ProfileScreen extends StatelessWidget {
   }
 
   // 3. AVAILABILITY
-  Widget _buildAvailabilitySection() {
+  Widget _buildAvailabilitySection({required String availability}) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -330,7 +446,7 @@ class ProfileScreen extends StatelessWidget {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'Available for discovery',
+                        availability,
                         style: AppTextStyles.bodyMedium.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
@@ -350,9 +466,9 @@ class ProfileScreen extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  'Open for: Remote guidance & local discussions in Chennai',
-                  style: AppTextStyles.captionSmall.copyWith(
+                const Text(
+                  'Open for: Remote guidance & local community discussions',
+                  style: TextStyle(
                     color: AppColors.textTertiary,
                     fontSize: 11.5,
                   ),
@@ -366,7 +482,10 @@ class ProfileScreen extends StatelessWidget {
   }
 
   // 4. I NEED (Active Needs)
-  Widget _buildNeedsSection(BuildContext context) {
+  Widget _buildNeedsSection(
+    BuildContext context, {
+    required List<String> activeNeeds,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -381,7 +500,7 @@ class ProfileScreen extends StatelessWidget {
                 borderRadius: AppSpacing.borderRadiusFull,
               ),
               child: Text(
-                '${_activeNeeds.length} active',
+                '${activeNeeds.length} active',
                 style: AppTextStyles.captionSmall.copyWith(
                   color: AppColors.primaryPurple,
                   fontWeight: FontWeight.w600,
@@ -392,7 +511,7 @@ class ProfileScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: AppSpacing.sm),
-        ..._activeNeeds.map((need) {
+        ...activeNeeds.map((need) {
           return Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.sm),
             child: Container(
@@ -437,7 +556,10 @@ class ProfileScreen extends StatelessWidget {
   }
 
   // 5. I CAN HELP (Capabilities)
-  Widget _buildHelpSection(BuildContext context) {
+  Widget _buildHelpSection(
+    BuildContext context, {
+    required List<String> capabilities,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -459,7 +581,7 @@ class ProfileScreen extends StatelessWidget {
                 borderRadius: AppSpacing.borderRadiusFull,
               ),
               child: Text(
-                '${_helpCapabilities.length} capabilities',
+                '${capabilities.length} capabilities',
                 style: AppTextStyles.captionSmall.copyWith(
                   color: AppColors.helpIcon,
                   fontWeight: FontWeight.w600,
@@ -473,204 +595,155 @@ class ProfileScreen extends StatelessWidget {
         Wrap(
           spacing: AppSpacing.xs,
           runSpacing: AppSpacing.xs,
-          children: _helpCapabilities
-              .map((capability) {
-                return Container(
-                  constraints: BoxConstraints(
-                    maxWidth:
-                        MediaQuery.of(context).size.width -
-                        AppSpacing.screenHorizontal * 2,
+          children: capabilities.map((capability) {
+            return Container(
+              constraints: const BoxConstraints(maxWidth: 260),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.helpBg,
+                borderRadius: AppSpacing.borderRadiusSm,
+                border: Border.all(color: AppColors.helpIcon.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.check_circle_outline_rounded,
+                    size: 14,
+                    color: AppColors.helpIcon,
                   ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.card,
-                    borderRadius: AppSpacing.borderRadiusFull,
-                    border: Border.all(color: AppColors.border, width: 1),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.check_circle_outline_rounded,
-                        color: AppColors.helpIcon,
-                        size: 15,
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      capability,
+                      style: AppTextStyles.captionSmall.copyWith(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w500,
                       ),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Text(
-                          capability,
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                );
-              })
-              .toList(growable: false),
+                ],
+              ),
+            );
+          }).toList(),
         ),
       ],
     );
   }
 
   // 6. PROFILE ACTIONS
-  Widget _buildActionsSection(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Settings & Privacy', style: AppTextStyles.subtitle),
-        const SizedBox(height: AppSpacing.sm),
-        _ActionTile(
-          icon: Icons.privacy_tip_outlined,
-          title: 'Privacy & Discovery',
-          subtitle: 'Manage what information is visible to discovery queries',
-          onTap: () =>
-              _showFeedback(context, 'Privacy & Discovery preferences'),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        _ActionTile(
-          icon: Icons.tune_rounded,
-          title: 'Preferences',
-          subtitle: 'Notifications, languages, and regional settings',
-          onTap: () => _showFeedback(context, 'Preferences opening...'),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        _ActionTile(
-          icon: Icons.help_outline_rounded,
-          title: 'Help & About NIVA',
-          subtitle: 'Version 1.0.0 • Community guidelines & trust policies',
-          onTap: () => _showFeedback(context, 'About NIVA & guidelines'),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        _ActionTile(
-          icon: Icons.shield_outlined,
-          title: 'Safety & Reporting',
-          subtitle: 'Community safety, reporting, and blocked user protections',
-          onTap: () =>
-              _showFeedback(context, 'Safety & community protections active'),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        _ActionTile(
-          icon: Icons.logout_rounded,
-          title: 'Sign Out',
-          subtitle: 'Log out of your account on this device',
-          onTap: () async {
-            try {
-              await AuthService.instance.signOut();
-            } catch (e) {
-              if (context.mounted) {
-                _showFeedback(
-                  context,
-                  'Logout failed: ${AuthService.getErrorMessage(e)}',
-                );
-              }
-            }
-          },
-        ),
-      ],
-    );
-  }
-
-  void _showFeedback(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  Widget _buildSafetyActions(BuildContext context) {
-    final currentUserId = AuthService.instance.currentUser?.uid;
-    if (targetUserId == null || targetUserId == currentUserId) {
+  Widget _buildActionsSection(
+    BuildContext context, {
+    required bool isOwnProfile,
+  }) {
+    if (isOwnProfile) {
       return const SizedBox.shrink();
     }
-    final name = targetUserName ?? 'User';
-    final safetyRepo = safetyRepository ?? SafetyRepository();
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: AppSpacing.xl),
-        const Text('Safety Actions', style: AppTextStyles.subtitle),
+        NivaButton(
+          label: 'Send Connection Request',
+          isFullWidth: true,
+          icon: const Icon(Icons.handshake_rounded, size: 18),
+          onPressed: () =>
+              _showFeedback(context, 'Connection request sent to peer.'),
+        ),
         const SizedBox(height: AppSpacing.sm),
-        Row(
-          children: [
-            Expanded(
-              child: NivaButton(
-                label: 'Report User',
-                variant: NivaButtonVariant.secondary,
-                onPressed: () {
-                  ReportSheet.show(
-                    context,
-                    reportedUserId: targetUserId!,
-                    reportedUserName: name,
-                    safetyRepository: safetyRepo,
-                  );
-                },
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: NivaButton(
-                label: 'Block User',
-                variant: NivaButtonVariant.secondary,
-                onPressed: () async {
-                  if (currentUserId == null) return;
-                  final confirmed = await showDialog<bool>(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      backgroundColor: AppColors.card,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: AppSpacing.borderRadiusLg,
-                      ),
-                      title: Text('Block $name?'),
-                      content: const Text(
-                        'You will no longer see each other in search, matching, or receive new messages.',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(ctx).pop(false),
-                          child: const Text('Cancel'),
-                        ),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.error,
-                            foregroundColor: AppColors.textOnPrimary,
-                          ),
-                          onPressed: () => Navigator.of(ctx).pop(true),
-                          child: const Text('Block'),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (confirmed == true && context.mounted) {
-                    await safetyRepo.blockUser(
-                      blockerId: currentUserId,
-                      blockedUserId: targetUserId!,
-                    );
-                    if (context.mounted) {
-                      _showFeedback(context, '$name has been blocked.');
-                    }
-                  }
-                },
-              ),
-            ),
-          ],
+        NivaButton(
+          label: 'Direct Message',
+          variant: NivaButtonVariant.secondary,
+          isFullWidth: true,
+          icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+          onPressed: () =>
+              _showFeedback(context, 'Opening secure messaging channel...'),
         ),
       ],
+    );
+  }
+
+  // 7. SAFETY & ACCOUNT ACTIONS
+  Widget _buildSafetyActions(BuildContext context, {required bool isOwnProfile}) {
+    if (isOwnProfile) {
+      return Padding(
+        padding: const EdgeInsets.only(top: AppSpacing.lg),
+        child: Center(
+          child: TextButton.icon(
+            icon: const Icon(
+              Icons.logout_rounded,
+              size: 18,
+              color: AppColors.error,
+            ),
+            label: const Text(
+              'Log Out',
+              style: TextStyle(
+                color: AppColors.error,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  backgroundColor: AppColors.card,
+                  title: const Text('Log Out'),
+                  content: const Text(
+                    'Are you sure you want to log out of NIVA?',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Cancel'),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.error,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('Log Out'),
+                    ),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                await AuthService.instance.signOut();
+              }
+            },
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.md),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          TextButton.icon(
+            icon: const Icon(Icons.flag_outlined, size: 16),
+            label: const Text('Report Profile'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.textTertiary,
+            ),
+            onPressed: () {
+              ReportSheet.show(
+                context,
+                reportedUserId: widget.targetUserId ?? 'unknown_user',
+                reportedUserName: widget.targetUserName ?? 'Community Member',
+                referenceId: widget.targetUserId ?? 'profile',
+                safetyRepository: widget.safetyRepository,
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 }
 
-/// Compact trust metric card for non-vanity indicators.
 class _TrustMetricCard extends StatelessWidget {
   const _TrustMetricCard({
     required this.icon,
@@ -689,127 +762,50 @@ class _TrustMetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
-      ),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: AppSpacing.borderRadiusLg,
         border: Border.all(color: AppColors.borderSubtle, width: 1),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
-            child: Icon(icon, color: iconColor, size: 18),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  value,
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: AppSpacing.borderRadiusSm,
                 ),
-                Text(
-                  label,
-                  style: AppTextStyles.captionSmall.copyWith(
-                    color: AppColors.textSecondary,
-                    fontSize: 11,
+                child: Icon(icon, color: iconColor, size: 18),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Flexible(
+                child: Text(
+                  value,
+                  style: AppTextStyles.h3.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
                   ),
-                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            label,
+            style: AppTextStyles.captionSmall.copyWith(
+              color: AppColors.textSecondary,
+              fontSize: 11.5,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Action item tile in the settings and preferences list.
-class _ActionTile extends StatelessWidget {
-  const _ActionTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: AppSpacing.borderRadiusLg,
-        border: Border.all(color: AppColors.borderSubtle, width: 1),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: AppSpacing.borderRadiusLg,
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.lg,
-              vertical: AppSpacing.md,
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: const BoxDecoration(
-                    color: AppColors.servicesBg,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, color: AppColors.primaryPurple, size: 19),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                      Text(
-                        subtitle,
-                        style: AppTextStyles.captionSmall.copyWith(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 14,
-                  color: AppColors.textTertiary,
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

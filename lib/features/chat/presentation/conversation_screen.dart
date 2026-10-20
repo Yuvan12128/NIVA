@@ -752,8 +752,8 @@ class _ContextualRequestBanner extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   needId.isNotEmpty
-                      ? 'React Development for Project'
-                      : 'Peer Collaboration with $otherUserName',
+                      ? 'Connection Need #$needId'
+                      : 'Direct Conversation with $otherUserName',
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 13.5,
@@ -768,7 +768,7 @@ class _ContextualRequestBanner extends StatelessWidget {
                   children: [
                     Flexible(
                       child: Text(
-                        'Due in 4 days • Front-end API & Polish',
+                        '1-to-1 secure chat • Community verified',
                         style: TextStyle(
                           fontSize: 11,
                           color: AppColors.textTertiary,

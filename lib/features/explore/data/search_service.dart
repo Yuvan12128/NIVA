@@ -400,14 +400,10 @@ class SearchService {
       debugPrint('SearchService: users query fallback notice: $e');
     }
 
-    // 3. Fallback seeds when Firestore is empty or offline
-    final allCandidates = <DiscoveryModel>[...firestoreCandidates];
-    for (final seed in seedDiscoveries) {
-      if (!seenIds.contains(seed.id)) {
-        allCandidates.add(seed);
-        seenIds.add(seed.id);
-      }
-    }
+    // 3. Fallback seeds ONLY when Firestore is empty (e.g. initial cold start, offline, or tests)
+    final allCandidates = firestoreCandidates.isNotEmpty
+        ? firestoreCandidates
+        : seedDiscoveries;
 
     return filterAndRank(
       candidates: allCandidates,
