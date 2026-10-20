@@ -49,7 +49,7 @@ android {
                 !keystoreProperties.getProperty("storeFile").isNullOrEmpty()) {
                 signingConfigs.getByName("release")
             } else {
-                null
+                signingConfigs.getByName("debug")
             }
         }
     }
