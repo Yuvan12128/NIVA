@@ -220,7 +220,7 @@ class HomeHeader extends StatelessWidget {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    '99.4% Trust Index',
+                    'Community Verified',
                     style: TextStyle(
                       fontFamily: AppTextStyles.fontFamily,
                       fontFamilyFallback: AppTextStyles.fontFallbacks,

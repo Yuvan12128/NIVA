@@ -1176,7 +1176,7 @@ class _DiscoveryCard extends StatelessWidget {
                                     const SizedBox(width: 3),
                                     Flexible(
                                       child: Text(
-                                        '${item.trustScore ?? 96}% Trust Index',
+                                        '${item.trustScore ?? 100} Trust Score',
                                         style: AppTextStyles.captionSmall
                                             .copyWith(
                                               color: AppColors.textSecondary,

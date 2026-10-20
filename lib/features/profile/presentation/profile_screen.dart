@@ -78,6 +78,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _openEditProfile() async {
     final currentUser = AuthService.instance.currentUser;
+    final isGuestOrTest = currentUser == null && widget.targetUserId == null;
     final fallbackName = currentUser?.displayName?.isNotEmpty == true
         ? currentUser!.displayName!
         : (currentUser?.email?.isNotEmpty == true
@@ -87,11 +88,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final baseUser = _userProfile ?? UserModel(
       uid: currentUser?.uid ?? '',
       name: fallbackName,
-      city: 'Chennai',
-      language: 'English, Tamil',
-      skills: _defaultHelpCapabilities,
-      canHelpWith: _defaultHelpCapabilities,
-      lookingFor: _defaultActiveNeeds,
+      bio: isGuestOrTest
+          ? 'Building accessible tools, collaborating on needs, and connecting with community peers across NIVA.'
+          : '',
+      city: isGuestOrTest ? 'Chennai' : '',
+      language: isGuestOrTest ? 'English, Tamil' : 'English',
+      skills: isGuestOrTest ? _defaultHelpCapabilities : const [],
+      canHelpWith: isGuestOrTest ? _defaultHelpCapabilities : const [],
+      lookingFor: isGuestOrTest ? _defaultActiveNeeds : const [],
       availability: 'Available',
     );
 
@@ -117,6 +121,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final currentUser = AuthService.instance.currentUser;
+    final isGuestOrTest = currentUser == null && widget.targetUserId == null;
+
     final fallbackName = currentUser?.displayName?.isNotEmpty == true
         ? currentUser!.displayName!
         : (currentUser?.email != null
@@ -129,11 +135,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     final city = _userProfile?.city.isNotEmpty == true
         ? _userProfile!.city
-        : 'Chennai (Remote flexible)';
+        : (isGuestOrTest ? 'Chennai (Remote flexible)' : 'Location not set');
 
     final language = _userProfile?.language.isNotEmpty == true
         ? _userProfile!.language
-        : 'English, Tamil';
+        : (isGuestOrTest ? 'English, Tamil' : 'English');
 
     final availability = _userProfile?.availability.isNotEmpty == true
         ? _userProfile!.availability
@@ -141,13 +147,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     final activeNeeds = _userProfile?.lookingFor.isNotEmpty == true
         ? _userProfile!.lookingFor
-        : _defaultActiveNeeds;
+        : (isGuestOrTest ? _defaultActiveNeeds : const <String>[]);
 
     final helpCapabilities = _userProfile?.canHelpWith.isNotEmpty == true
         ? _userProfile!.canHelpWith
         : (_userProfile?.skills.isNotEmpty == true
               ? _userProfile!.skills
-              : _defaultHelpCapabilities);
+              : (isGuestOrTest ? _defaultHelpCapabilities : const <String>[]));
+
+    final bioText = _userProfile?.bio.isNotEmpty == true
+        ? _userProfile!.bio
+        : (isGuestOrTest
+            ? 'Building accessible tools, collaborating on needs, and connecting with community peers across NIVA.'
+            : 'No bio added yet. Tap Edit Profile to introduce yourself to the community.');
 
     final isOwnProfile = widget.targetUserId == null ||
         widget.targetUserId == currentUser?.uid;
@@ -183,6 +195,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     displayName: displayName,
                     city: city,
                     language: language,
+                    bio: bioText,
+                    hasCustomBio: _userProfile?.bio.isNotEmpty == true || isGuestOrTest,
                     isOwnProfile: isOwnProfile,
                   ),
                   const SizedBox(height: AppSpacing.xl),
@@ -222,6 +236,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required String displayName,
     required String city,
     required String language,
+    required String bio,
+    required bool hasCustomBio,
     required bool isOwnProfile,
   }) {
     return Container(
@@ -323,11 +339,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
-            'Building accessible tools, collaborating on needs, and connecting with community peers across NIVA.',
+            bio,
             style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.textPrimary,
+              color: hasCustomBio
+                  ? AppColors.textPrimary
+                  : AppColors.textTertiary,
               height: 1.45,
               fontSize: 13.5,
+              fontStyle: hasCustomBio ? FontStyle.normal : FontStyle.italic,
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -347,6 +366,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // 2. TRUST SECTION (Useful trust indicators only)
   Widget _buildTrustSection() {
     final trustScore = _userProfile?.trustScore ?? 100;
+    final completedConnections = _userProfile?.completedConnections ?? 0;
+    final helpfulInteractions = _userProfile?.helpfulInteractions ?? 0;
+    final reviewCount = _userProfile?.reviewCount ?? 0;
+    final rating = _userProfile?.rating ?? 5.0;
+
+    final reviewLabel = reviewCount == 0
+        ? 'No reviews yet'
+        : '$reviewCount verified ${reviewCount == 1 ? 'review' : 'reviews'}';
+    final ratingText = reviewCount == 0 ? '5.0' : rating.toStringAsFixed(1);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -359,7 +388,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 icon: Icons.handshake_outlined,
                 iconColor: AppColors.primaryPurple,
                 iconBg: AppColors.servicesBg,
-                value: '18',
+                value: '$completedConnections',
                 label: 'Completed connections',
               ),
             ),
@@ -369,7 +398,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 icon: Icons.volunteer_activism_outlined,
                 iconColor: AppColors.helpIcon,
                 iconBg: AppColors.helpBg,
-                value: '42',
+                value: '$helpfulInteractions',
                 label: 'Helpful interactions',
               ),
             ),
@@ -383,8 +412,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 icon: Icons.star_rounded,
                 iconColor: Colors.amber.shade700,
                 iconBg: AppColors.warningLight,
-                value: '4.9',
-                label: '24 verified reviews',
+                value: ratingText,
+                label: reviewLabel,
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
@@ -458,7 +487,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Active this week • Typically responds within ~1 hour',
+                  'Active this week • Verified Community Member',
                   style: AppTextStyles.captionSmall.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -511,46 +540,64 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
         const SizedBox(height: AppSpacing.sm),
-        ...activeNeeds.map((need) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-            child: Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: AppColors.card,
-                borderRadius: AppSpacing.borderRadiusLg,
-                border: Border.all(color: AppColors.borderSubtle, width: 1),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: const BoxDecoration(
-                      color: AppColors.servicesBg,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.person_search_rounded,
-                      color: AppColors.primaryPurple,
-                      size: 18,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Text(
-                      need,
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
+        if (activeNeeds.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: AppSpacing.borderRadiusLg,
+              border: Border.all(color: AppColors.borderSubtle, width: 1),
+            ),
+            child: Text(
+              'No active needs listed yet. Tap Edit Profile to add what you are looking for.',
+              style: AppTextStyles.captionSmall.copyWith(
+                color: AppColors.textTertiary,
+                fontStyle: FontStyle.italic,
               ),
             ),
-          );
-        }),
+          )
+        else
+          ...activeNeeds.map((need) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: Container(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: AppSpacing.borderRadiusLg,
+                  border: Border.all(color: AppColors.borderSubtle, width: 1),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: const BoxDecoration(
+                        color: AppColors.servicesBg,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.person_search_rounded,
+                        color: AppColors.primaryPurple,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Text(
+                        need,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
       ],
     );
   }
@@ -592,23 +639,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
         const SizedBox(height: AppSpacing.sm),
-        Wrap(
-          spacing: AppSpacing.xs,
-          runSpacing: AppSpacing.xs,
-          children: capabilities.map((capability) {
-            return Container(
-              constraints: const BoxConstraints(maxWidth: 260),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.helpBg,
-                borderRadius: AppSpacing.borderRadiusSm,
-                border: Border.all(color: AppColors.helpIcon.withValues(alpha: 0.2)),
+        if (capabilities.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: AppSpacing.borderRadiusLg,
+              border: Border.all(color: AppColors.borderSubtle, width: 1),
+            ),
+            child: Text(
+              'No capabilities listed yet. Tap Edit Profile to add what you can help with.',
+              style: AppTextStyles.captionSmall.copyWith(
+                color: AppColors.textTertiary,
+                fontStyle: FontStyle.italic,
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.check_circle_outline_rounded,
+            ),
+          )
+        else
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: capabilities.map((capability) {
+              return Container(
+                constraints: const BoxConstraints(maxWidth: 260),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.helpBg,
+                  borderRadius: AppSpacing.borderRadiusSm,
+                  border: Border.all(color: AppColors.helpIcon.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.check_circle_outline_rounded,
                     size: 14,
                     color: AppColors.helpIcon,
                   ),

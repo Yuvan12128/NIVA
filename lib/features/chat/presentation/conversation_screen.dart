@@ -250,7 +250,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                           ),
                         ),
                         TextSpan(
-                          text: ' • 98% Trust Score',
+                          text: ' • Community Verified',
                           style: TextStyle(
                             fontSize: 11,
                             color: AppColors.textSecondary,
@@ -833,7 +833,7 @@ class _SystemMatchCard extends StatelessWidget {
               SizedBox(width: 6),
               Flexible(
                 child: Text(
-                  '94% Compatibility Match',
+                  'Need Match Connected',
                   style: TextStyle(
                     color: AppColors.primaryPurple,
                     fontWeight: FontWeight.w700,

@@ -13,11 +13,16 @@ class UserModel {
     this.city = 'Chennai',
     this.language = 'English',
     this.role = 'member',
+    this.bio = '',
     this.skills = const [],
     this.canHelpWith = const [],
     this.lookingFor = const [],
     this.availability = 'Available',
     this.trustScore = 100,
+    this.completedConnections = 0,
+    this.helpfulInteractions = 0,
+    this.reviewCount = 0,
+    this.rating = 5.0,
     this.createdAt,
     this.updatedAt,
   });
@@ -31,11 +36,16 @@ class UserModel {
   final String city;
   final String language;
   final String role;
+  final String bio;
   final List<String> skills;
   final List<String> canHelpWith;
   final List<String> lookingFor;
   final String availability;
   final int trustScore;
+  final int completedConnections;
+  final int helpfulInteractions;
+  final int reviewCount;
+  final double rating;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -55,11 +65,16 @@ class UserModel {
       'city': city,
       'language': language,
       'role': role,
+      'bio': bio,
       'skills': skills,
       'canHelpWith': canHelpWith,
       'lookingFor': lookingFor,
       'availability': availability,
       'trustScore': trustScore,
+      'completedConnections': completedConnections,
+      'helpfulInteractions': helpfulInteractions,
+      'reviewCount': reviewCount,
+      'rating': rating,
       'createdAt': createdAt != null
           ? Timestamp.fromDate(createdAt!)
           : (useServerTimestamp ? FieldValue.serverTimestamp() : null),
@@ -88,6 +103,7 @@ class UserModel {
       city: map['city'] as String? ?? '',
       language: map['language'] as String? ?? 'English',
       role: map['role'] as String? ?? 'member',
+      bio: map['bio'] as String? ?? '',
       skills:
           (map['skills'] as List<dynamic>?)
               ?.map((e) => e.toString())
@@ -105,6 +121,12 @@ class UserModel {
           const [],
       availability: map['availability'] as String? ?? 'Available',
       trustScore: (map['trustScore'] as num?)?.toInt() ?? 100,
+      completedConnections:
+          (map['completedConnections'] as num?)?.toInt() ?? 0,
+      helpfulInteractions:
+          (map['helpfulInteractions'] as num?)?.toInt() ?? 0,
+      reviewCount: (map['reviewCount'] as num?)?.toInt() ?? 0,
+      rating: (map['rating'] as num?)?.toDouble() ?? 5.0,
       createdAt: parseDate(map['createdAt']),
       updatedAt: parseDate(map['updatedAt']),
     );
@@ -120,11 +142,16 @@ class UserModel {
     String? city,
     String? language,
     String? role,
+    String? bio,
     List<String>? skills,
     List<String>? canHelpWith,
     List<String>? lookingFor,
     String? availability,
     int? trustScore,
+    int? completedConnections,
+    int? helpfulInteractions,
+    int? reviewCount,
+    double? rating,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -138,11 +165,16 @@ class UserModel {
       city: city ?? this.city,
       language: language ?? this.language,
       role: role ?? this.role,
+      bio: bio ?? this.bio,
       skills: skills ?? this.skills,
       canHelpWith: canHelpWith ?? this.canHelpWith,
       lookingFor: lookingFor ?? this.lookingFor,
       availability: availability ?? this.availability,
       trustScore: trustScore ?? this.trustScore,
+      completedConnections: completedConnections ?? this.completedConnections,
+      helpfulInteractions: helpfulInteractions ?? this.helpfulInteractions,
+      reviewCount: reviewCount ?? this.reviewCount,
+      rating: rating ?? this.rating,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

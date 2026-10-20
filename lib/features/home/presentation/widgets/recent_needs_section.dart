@@ -424,7 +424,7 @@ class _NeedCard extends StatelessWidget {
                           ),
                           SizedBox(width: 3),
                           Text(
-                            '98% Trust',
+                            'Verified Peer',
                             style: TextStyle(
                               fontFamily: AppTextStyles.fontFamily,
                               fontFamilyFallback: AppTextStyles.fontFallbacks,

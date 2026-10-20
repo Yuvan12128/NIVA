@@ -43,6 +43,7 @@ class EditProfileSheet extends StatefulWidget {
 
 class _EditProfileSheetState extends State<EditProfileSheet> {
   late final TextEditingController _nameController;
+  late final TextEditingController _bioController;
   late final TextEditingController _cityController;
   late final TextEditingController _languageController;
   late final TextEditingController _skillsController;
@@ -66,6 +67,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.user.name);
+    _bioController = TextEditingController(text: widget.user.bio);
     _cityController = TextEditingController(text: widget.user.city);
     _languageController = TextEditingController(text: widget.user.language);
     _skillsController =
@@ -83,6 +85,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
   @override
   void dispose() {
     _nameController.dispose();
+    _bioController.dispose();
     _cityController.dispose();
     _languageController.dispose();
     _skillsController.dispose();
@@ -126,6 +129,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
 
       final updateMap = <String, dynamic>{
         'name': name,
+        'bio': _bioController.text.trim(),
         'city': _cityController.text.trim(),
         'language': _languageController.text.trim().isNotEmpty
             ? _languageController.text.trim()
@@ -140,24 +144,25 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
         await _userRepo.updateUserProfile(uid, updateMap);
       }
 
-      final updatedModel = UserModel(
-        uid: uid,
+      final currentAuthUser = AuthService.instance.currentUser;
+      if (currentAuthUser != null && currentAuthUser.displayName != name) {
+        try {
+          await currentAuthUser.updateDisplayName(name);
+        } catch (_) {}
+      }
+
+      final updatedModel = widget.user.copyWith(
+        uid: uid.isNotEmpty ? uid : widget.user.uid,
         name: name,
-        email: widget.user.email,
-        photoUrl: widget.user.photoUrl,
-        country: widget.user.country,
-        state: widget.user.state,
+        bio: _bioController.text.trim(),
         city: _cityController.text.trim(),
         language: _languageController.text.trim().isNotEmpty
             ? _languageController.text.trim()
             : 'English',
-        role: widget.user.role,
         skills: updatedSkills,
         canHelpWith: updatedHelp,
         lookingFor: updatedLookingFor,
         availability: _selectedAvailability,
-        trustScore: widget.user.trustScore,
-        createdAt: widget.user.createdAt,
         updatedAt: DateTime.now(),
       );
 
@@ -269,6 +274,28 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                                 color: AppColors.textTertiary,
                                 size: 20,
                               ),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+
+                          // Bio / About
+                          Text(
+                            'About / Bio',
+                            style: AppTextStyles.caption.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          TextField(
+                            controller: _bioController,
+                            style: AppTextStyles.bodyMedium,
+                            maxLines: 3,
+                            minLines: 2,
+                            decoration: const InputDecoration(
+                              hintText:
+                                  'Share a short intro about yourself, your interests, or what drives you...',
+                              alignLabelWithHint: true,
                             ),
                           ),
                           const SizedBox(height: AppSpacing.md),
