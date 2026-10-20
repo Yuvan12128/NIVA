@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../auth/data/auth_service.dart';
 import '../../needs/data/need_model.dart';
 import '../../safety/data/safety_repository.dart';
 import '../../user/data/user_model.dart';
@@ -27,11 +28,19 @@ class MatchingService {
 
   /// Find and rank the best matching "I Can Help" profiles/items for a given need.
   /// Uses strictly limited queries (max 20 candidates per collection) and in-memory scoring.
-  Future<List<MatchResult>> findMatches(NeedModel need, {int limit = 5}) async {
+  Future<List<MatchResult>> findMatches(
+    NeedModel need, {
+    int limit = 5,
+    String? currentUserId,
+  }) async {
     try {
       final List<MatchResult> candidates = [];
       final Set<String> seenUserIds = {};
-      final blockedIds = await _safetyRepo.getBlockedUserIds(need.userId);
+      final activeUserId = currentUserId ??
+          (AuthService.instance.currentUser?.uid ?? '');
+      final blockedIds = await _safetyRepo.getBlockedUserIds(
+        activeUserId.isNotEmpty ? activeUserId : need.userId,
+      );
 
       // 1. Fetch active Help items (limited to 20 documents)
       try {
@@ -46,8 +55,9 @@ class MatchingService {
           final data = doc.data();
           final candidateUserId = data['userId'] as String? ?? '';
 
-          // Never match the user with their own post or blocked users
+          // Never match the user with their own post, current active user, or blocked users
           if (candidateUserId == need.userId ||
+              (activeUserId.isNotEmpty && candidateUserId == activeUserId) ||
               blockedIds.contains(candidateUserId)) {
             continue;
           }
@@ -99,6 +109,7 @@ class MatchingService {
         for (final doc in usersSnapshot.docs) {
           final candidateUserId = doc.id;
           if (candidateUserId == need.userId ||
+              (activeUserId.isNotEmpty && candidateUserId == activeUserId) ||
               seenUserIds.contains(candidateUserId) ||
               blockedIds.contains(candidateUserId)) {
             continue;
@@ -142,7 +153,73 @@ class MatchingService {
         debugPrint('MatchingService: users query notice: $e');
       }
 
-      // 3. Rank candidates by highest total match score descending
+      // 3. Fallback to curated peer helpers if no other candidates exist yet
+      if (candidates.isEmpty) {
+        final seedHelpers = [
+          (
+            id: 'peer_helper_suresh',
+            name: 'Suresh Raina',
+            skills: ['Java', 'Algorithms', 'DSA', 'Backend', 'Mentorship'],
+            location: 'Chennai',
+            avail: 'Available today',
+            cat: 'Education',
+            trust: 100,
+          ),
+          (
+            id: 'peer_helper_priya',
+            name: 'Priya Sharma',
+            skills: ['React', 'Flutter', 'Frontend', 'Mobile', 'UI Design'],
+            location: 'Bengaluru',
+            avail: 'Flexible',
+            cat: 'Engineering',
+            trust: 98,
+          ),
+          (
+            id: 'peer_helper_karthik',
+            name: 'Karthik Raja',
+            skills: ['Hardware', 'Laptop repair', 'IT Support', 'Electronics'],
+            location: 'Chennai',
+            avail: 'Weekends',
+            cat: 'Services',
+            trust: 96,
+          ),
+        ];
+
+        for (final seed in seedHelpers) {
+          if (seed.id == activeUserId || seed.id == need.userId) continue;
+
+          final scoreBreakdown = computeMatchScore(
+            need: need,
+            candidateSkills: seed.skills,
+            candidateLocation: seed.location,
+            candidateAvailability: seed.avail,
+            candidateCategory: seed.cat,
+            candidateTrustScore: seed.trust,
+          );
+
+          candidates.add(
+            MatchResult(
+              id: seed.id,
+              userId: seed.id,
+              name: seed.name,
+              category: seed.cat,
+              skills: seed.skills,
+              location: seed.location,
+              availability: seed.avail,
+              trustScore: seed.trust,
+              score: scoreBreakdown.totalScore,
+              matchedSkills: scoreBreakdown.matchedSkills,
+              skillScore: scoreBreakdown.skillScore,
+              locationScore: scoreBreakdown.locationScore,
+              availabilityScore: scoreBreakdown.availabilityScore,
+              categoryScore: scoreBreakdown.categoryScore,
+              trustScoreComponent: scoreBreakdown.trustScore,
+            ),
+          );
+        }
+      }
+
+      // 4. Rank candidates by highest total match score descending
       candidates.sort((a, b) => b.score.compareTo(a.score));
 
       return candidates.take(limit).toList(growable: false);

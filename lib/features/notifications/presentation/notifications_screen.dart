@@ -4,15 +4,25 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../auth/data/auth_service.dart';
+import '../../chat/data/chat_repository.dart';
+import '../../chat/presentation/conversation_screen.dart';
+import '../../connect/data/connection_request_repository.dart';
 import '../data/notification_model.dart';
 import '../data/notification_repository.dart';
 
 /// Notifications Screen displaying in-app updates for connections and messages.
-/// Uses a real-time listener strictly scoped to this screen lifecycle.
+/// Supports immediate Accept/Decline actions and direct 1-to-1 chat launches.
 class NotificationsScreen extends StatefulWidget {
-  const NotificationsScreen({super.key, this.notificationRepository});
+  const NotificationsScreen({
+    super.key,
+    this.notificationRepository,
+    this.connectionRequestRepository,
+    this.chatRepository,
+  });
 
   final NotificationRepository? notificationRepository;
+  final ConnectionRequestRepository? connectionRequestRepository;
+  final ChatRepository? chatRepository;
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
@@ -21,6 +31,13 @@ class NotificationsScreen extends StatefulWidget {
 class _NotificationsScreenState extends State<NotificationsScreen> {
   late final NotificationRepository _notificationRepo =
       widget.notificationRepository ?? NotificationRepository();
+  late final ConnectionRequestRepository _connectionRepo =
+      widget.connectionRequestRepository ?? ConnectionRequestRepository();
+  late final ChatRepository _chatRepo =
+      widget.chatRepository ?? ChatRepository();
+
+  final Map<String, String> _requestStatuses = {};
+  final Set<String> _processingRequestIds = {};
 
   String _formatTimeAgo(DateTime? date) {
     if (date == null) return 'Just now';
@@ -57,6 +74,153 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
+  String _resolveName(NotificationModel notification) {
+    final parts = notification.body.split(' ');
+    if (parts.isNotEmpty &&
+        parts.first != 'Someone' &&
+        parts.first != 'Your' &&
+        parts.first != 'You') {
+      return parts.first;
+    }
+    return 'Community Member';
+  }
+
+  Future<void> _handleAccept(NotificationModel notification) async {
+    final currentUserId = AuthService.instance.currentUser?.uid ?? '';
+    if (currentUserId.isEmpty || notification.referenceId.isEmpty) return;
+
+    setState(() {
+      _processingRequestIds.add(notification.referenceId);
+    });
+
+    try {
+      await _connectionRepo.respondToRequest(
+        requestId: notification.referenceId,
+        responderUserId: currentUserId,
+        status: 'accepted',
+      );
+
+      if (!notification.isRead) {
+        await _notificationRepo.markAsRead(notification.id);
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _processingRequestIds.remove(notification.referenceId);
+        _requestStatuses[notification.referenceId] = 'accepted';
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Connection accepted! You can now chat.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _processingRequestIds.remove(notification.referenceId);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to accept: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleDecline(NotificationModel notification) async {
+    final currentUserId = AuthService.instance.currentUser?.uid ?? '';
+    if (currentUserId.isEmpty || notification.referenceId.isEmpty) return;
+
+    setState(() {
+      _processingRequestIds.add(notification.referenceId);
+    });
+
+    try {
+      await _connectionRepo.respondToRequest(
+        requestId: notification.referenceId,
+        responderUserId: currentUserId,
+        status: 'declined',
+      );
+
+      if (!notification.isRead) {
+        await _notificationRepo.markAsRead(notification.id);
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _processingRequestIds.remove(notification.referenceId);
+        _requestStatuses[notification.referenceId] = 'declined';
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Connection request declined.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _processingRequestIds.remove(notification.referenceId);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to decline: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _openChat(NotificationModel notification) async {
+    final currentUserId = AuthService.instance.currentUser?.uid ?? '';
+    if (currentUserId.isEmpty) return;
+
+    if (!notification.isRead) {
+      _notificationRepo.markAsRead(notification.id);
+    }
+
+    try {
+      final otherUserId = notification.senderId;
+      final otherName = _resolveName(notification);
+
+      final chat = await _chatRepo.getOrCreateChat(
+        connectionRequestId: notification.referenceId,
+        needId: '',
+        user1: currentUserId,
+        user2: otherUserId,
+        participantNames: {
+          currentUserId: AuthService.instance.currentUser?.displayName ?? 'You',
+          otherUserId: otherName,
+        },
+      );
+
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ConversationScreen(
+            chat: chat,
+            otherUserName: otherName,
+            otherUserId: otherUserId,
+            chatRepository: _chatRepo,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not open conversation: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   void _handleTap(NotificationModel notification) {
     if (!notification.isRead) {
       _notificationRepo.markAsRead(notification.id);
@@ -64,9 +228,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     if (notification.type == 'new_message' ||
         notification.type == 'connection_accepted') {
-      Navigator.pop(
-        context,
-      ); // Return to main navigation where chat tab is available
+      _openChat(notification);
     }
   }
 
@@ -170,6 +332,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     final (icon, iconColor, iconBg) = _resolveTypeStyle(
                       item.type,
                     );
+                    final isProcessing =
+                        _processingRequestIds.contains(item.referenceId);
 
                     return Material(
                       color: item.isRead
@@ -233,6 +397,247 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                             fontSize: 13,
                                           ),
                                     ),
+
+                                    // Action buttons for connection requests & messages
+                                    if (item.type == 'connection_request') ...[
+                                      const SizedBox(height: AppSpacing.sm),
+                                      if (_requestStatuses[item.referenceId] ==
+                                          'accepted')
+                                        Row(
+                                          children: [
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 8,
+                                                vertical: 4,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.servicesBg,
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: const Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    Icons.check_circle_rounded,
+                                                    size: 14,
+                                                    color:
+                                                        AppColors.primaryPurple,
+                                                  ),
+                                                  SizedBox(width: 4),
+                                                  Text(
+                                                    'Accepted',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: AppColors
+                                                          .primaryPurple,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: AppSpacing.sm),
+                                            ElevatedButton.icon(
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor:
+                                                    AppColors.primaryPurple,
+                                                foregroundColor: Colors.white,
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 14,
+                                                  vertical: 8,
+                                                ),
+                                                minimumSize: Size.zero,
+                                                tapTargetSize:
+                                                    MaterialTapTargetSize
+                                                        .shrinkWrap,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                              ),
+                                              onPressed: () => _openChat(item),
+                                              icon: const Icon(
+                                                Icons
+                                                    .chat_bubble_outline_rounded,
+                                                size: 14,
+                                              ),
+                                              label: const Text(
+                                                'Chat Now',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        )
+                                      else if (_requestStatuses[
+                                              item.referenceId] ==
+                                          'declined')
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.surfaceLow,
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          child: const Text(
+                                            'Declined',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: AppColors.textTertiary,
+                                            ),
+                                          ),
+                                        )
+                                      else
+                                        Row(
+                                          children: [
+                                            ElevatedButton.icon(
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor:
+                                                    AppColors.primaryPurple,
+                                                foregroundColor: Colors.white,
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 14,
+                                                  vertical: 8,
+                                                ),
+                                                minimumSize: Size.zero,
+                                                tapTargetSize:
+                                                    MaterialTapTargetSize
+                                                        .shrinkWrap,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                              ),
+                                              onPressed: isProcessing
+                                                  ? null
+                                                  : () => _handleAccept(item),
+                                              icon: const Icon(
+                                                Icons.check_rounded,
+                                                size: 14,
+                                              ),
+                                              label: Text(
+                                                isProcessing
+                                                    ? 'Accepting...'
+                                                    : 'Accept',
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: AppSpacing.sm),
+                                            OutlinedButton(
+                                              style: OutlinedButton.styleFrom(
+                                                foregroundColor:
+                                                    AppColors.textSecondary,
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 14,
+                                                  vertical: 8,
+                                                ),
+                                                minimumSize: Size.zero,
+                                                tapTargetSize:
+                                                    MaterialTapTargetSize
+                                                        .shrinkWrap,
+                                                side: const BorderSide(
+                                                  color: AppColors.border,
+                                                ),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                              ),
+                                              onPressed: isProcessing
+                                                  ? null
+                                                  : () => _handleDecline(item),
+                                              child: const Text(
+                                                'Decline',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                    ] else if (item.type ==
+                                        'connection_accepted') ...[
+                                      const SizedBox(height: AppSpacing.sm),
+                                      ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              AppColors.primaryPurple,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 14,
+                                            vertical: 8,
+                                          ),
+                                          minimumSize: Size.zero,
+                                          tapTargetSize: MaterialTapTargetSize
+                                              .shrinkWrap,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                        ),
+                                        onPressed: () => _openChat(item),
+                                        icon: const Icon(
+                                          Icons.chat_bubble_outline_rounded,
+                                          size: 14,
+                                        ),
+                                        label: const Text(
+                                          'Chat Now',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ] else if (item.type == 'new_message') ...[
+                                      const SizedBox(height: AppSpacing.sm),
+                                      OutlinedButton.icon(
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor:
+                                              AppColors.primaryPurple,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 14,
+                                            vertical: 8,
+                                          ),
+                                          minimumSize: Size.zero,
+                                          tapTargetSize: MaterialTapTargetSize
+                                              .shrinkWrap,
+                                          side: const BorderSide(
+                                            color: AppColors.primaryPurple,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                        ),
+                                        onPressed: () => _openChat(item),
+                                        icon: const Icon(
+                                          Icons.reply_rounded,
+                                          size: 14,
+                                        ),
+                                        label: const Text(
+                                          'Reply',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),

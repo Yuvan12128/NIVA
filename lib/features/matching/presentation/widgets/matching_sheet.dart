@@ -89,9 +89,13 @@ class _MatchingSheetState extends State<MatchingSheet> {
         );
       }
 
+      final filteredResults = results
+          .where((r) => currentUserId == null || r.userId != currentUserId)
+          .toList();
+
       if (!mounted) return;
       setState(() {
-        _matches = results;
+        _matches = filteredResults;
         _sentUserIds.addAll(alreadySent);
         _isLoading = false;
       });
@@ -106,6 +110,16 @@ class _MatchingSheetState extends State<MatchingSheet> {
 
   Future<void> _handleConnect(MatchResult match) async {
     final currentUserId = AuthService.instance.currentUser?.uid ?? 'anonymous';
+    if (match.userId == currentUserId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You cannot send a connection request to yourself.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     if (_sendingUserIds.contains(match.userId) ||
         _sentUserIds.contains(match.userId)) {
       return;

@@ -77,6 +77,7 @@ class NotificationRepository {
   }
 
   /// Real-time stream of notifications strictly scoped to the active Notifications screen.
+  /// Bounded query without requiring composite index (in-memory sort by createdAt descending).
   Stream<List<NotificationModel>> streamNotifications(
     String recipientId, {
     int limit = 30,
@@ -85,19 +86,18 @@ class NotificationRepository {
 
     return _notificationsCollection
         .where('recipientId', isEqualTo: recipientId)
-        .orderBy('createdAt', descending: true)
         .limit(limit)
         .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
+        .map((snapshot) {
+          final list = snapshot.docs
               .map((doc) => NotificationModel.fromMap(doc.id, doc.data()))
-              .toList(growable: false),
-        )
-        .handleError((dynamic error) {
-          debugPrint(
-            'NotificationRepository.streamNotifications error: $error',
-          );
-          return const <NotificationModel>[];
+              .toList();
+          list.sort((a, b) {
+            final aTime = a.createdAt ?? DateTime(0);
+            final bTime = b.createdAt ?? DateTime(0);
+            return bTime.compareTo(aTime);
+          });
+          return list;
         });
   }
 
@@ -111,13 +111,18 @@ class NotificationRepository {
     try {
       final snapshot = await _notificationsCollection
           .where('recipientId', isEqualTo: recipientId)
-          .orderBy('createdAt', descending: true)
           .limit(limit)
           .get();
 
-      return snapshot.docs
+      final list = snapshot.docs
           .map((doc) => NotificationModel.fromMap(doc.id, doc.data()))
-          .toList(growable: false);
+          .toList();
+      list.sort((a, b) {
+        final aTime = a.createdAt ?? DateTime(0);
+        final bTime = b.createdAt ?? DateTime(0);
+        return bTime.compareTo(aTime);
+      });
+      return list;
     } catch (e) {
       debugPrint('NotificationRepository.getNotifications error: $e');
       return const [];

@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../auth/data/auth_service.dart';
+import '../../chat/data/chat_repository.dart';
 import '../../notifications/data/notification_repository.dart';
 import '../../safety/data/safety_repository.dart';
 import 'connection_request_model.dart';
@@ -92,12 +94,17 @@ class ConnectionRequestRepository {
 
       // 4. Create in-app notification for the recipient
       try {
+        final senderName =
+            AuthService.instance.currentUser?.displayName?.isNotEmpty == true
+                ? AuthService.instance.currentUser!.displayName!
+                : 'A peer';
+
         await _notificationRepo.createNotification(
           recipientId: toUserId,
           senderId: fromUserId,
           type: 'connection_request',
           title: 'New Connection Request',
-          body: 'Someone wants to connect regarding a shared need.',
+          body: '$senderName wants to connect with you.',
           referenceId: docRef.id,
         );
       } catch (notifErr) {
@@ -142,11 +149,30 @@ class ConnectionRequestRepository {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      // If accepted, notify the original sender
+      // If accepted, initialize chat and notify the original sender
       if (status == 'accepted') {
-        try {
-          final fromUserId = data['fromUserId'] as String? ?? '';
-          if (fromUserId.isNotEmpty) {
+        final fromUserId = data['fromUserId'] as String? ?? '';
+        final needId = data['needId'] as String? ?? '';
+
+        if (fromUserId.isNotEmpty) {
+          // Initialize chat immediately
+          try {
+            final chatRepo = ChatRepository(
+              firestore: _firestore,
+              notificationRepository: _notificationRepo,
+              safetyRepository: _safetyRepo,
+            );
+            await chatRepo.getOrCreateChat(
+              connectionRequestId: requestId,
+              needId: needId,
+              user1: fromUserId,
+              user2: responderUserId,
+            );
+          } catch (chatErr) {
+            debugPrint('Notice: chat creation error: $chatErr');
+          }
+
+          try {
             await _notificationRepo.createNotification(
               recipientId: fromUserId,
               senderId: responderUserId,
@@ -155,9 +181,9 @@ class ConnectionRequestRepository {
               body: 'Your connection request was accepted. You can now chat.',
               referenceId: requestId,
             );
+          } catch (notifErr) {
+            debugPrint('Notice: notification creation error: $notifErr');
           }
-        } catch (notifErr) {
-          debugPrint('Notice: notification creation error: $notifErr');
         }
       }
     } catch (e) {
