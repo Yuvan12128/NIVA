@@ -340,13 +340,39 @@ class SearchService {
     return sorted;
   }
 
+  // In-memory candidate cache with 60s TTL to conserve Firebase Free Spark Plan quota
+  static List<DiscoveryModel>? _cachedCandidates;
+  static DateTime? _cacheTimestamp;
+  static const Duration _cacheTtl = Duration(seconds: 60);
+
+  /// Explicitly clear candidate cache (e.g., on pull-to-refresh)
+  static void clearCache() {
+    _cachedCandidates = null;
+    _cacheTimestamp = null;
+  }
+
   /// Execute a practical bounded discovery search combining Firestore needs and helpers.
   Future<List<DiscoveryModel>> searchDiscoveries({
     required String query,
     required SearchFilter filter,
     Set<String> blockedUserIds = const {},
     int limit = 30,
+    bool forceRefresh = false,
   }) async {
+    // Check if in-memory cache is valid to save Firestore read quota
+    if (!forceRefresh &&
+        _cachedCandidates != null &&
+        _cacheTimestamp != null &&
+        DateTime.now().difference(_cacheTimestamp!) < _cacheTtl) {
+      return filterAndRank(
+        candidates: _cachedCandidates!,
+        query: query,
+        filter: filter,
+        blockedUserIds: blockedUserIds,
+        limit: limit,
+      );
+    }
+
     final List<DiscoveryModel> firestoreCandidates = [];
     final Set<String> seenIds = {};
 
@@ -404,6 +430,10 @@ class SearchService {
     final allCandidates = firestoreCandidates.isNotEmpty
         ? firestoreCandidates
         : seedDiscoveries;
+
+    // Save to cache
+    _cachedCandidates = allCandidates;
+    _cacheTimestamp = DateTime.now();
 
     return filterAndRank(
       candidates: allCandidates,

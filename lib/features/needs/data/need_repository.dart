@@ -13,6 +13,17 @@ class NeedRepository {
   CollectionReference<Map<String, dynamic>> get _needsCollection =>
       _firestore.collection('needs');
 
+  // In-memory cache to conserve Firestore read quota on the free tier
+  static List<NeedModel>? _cachedRecentNeeds;
+  static DateTime? _recentNeedsTimestamp;
+  static const Duration _cacheTtl = Duration(seconds: 60);
+
+  /// Invalidate recent needs cache (e.g. after publishing or on pull-to-refresh)
+  static void clearRecentNeedsCache() {
+    _cachedRecentNeeds = null;
+    _recentNeedsTimestamp = null;
+  }
+
   /// Publish a new need or help offer to Firestore.
   /// Uses server-side timestamps for consistency.
   Future<String> createNeed(NeedModel need) async {
@@ -23,6 +34,7 @@ class NeedRepository {
 
       final data = need.toMap(useServerTimestamp: true);
       await docRef.set(data);
+      clearRecentNeedsCache();
       return docRef.id;
     } catch (e) {
       debugPrint('NeedRepository.createNeed error: $e');
@@ -95,11 +107,21 @@ class NeedRepository {
         });
   }
 
-  /// One-shot fetch for recent needs (avoids active listener overhead).
+  /// One-shot fetch for recent needs (with 60s in-memory caching to save Firestore free quota).
   Future<List<NeedModel>> getRecentNeeds({
     int limit = 10,
     DocumentSnapshot? startAfter,
+    bool forceRefresh = false,
   }) async {
+    // Return cached items if available and valid
+    if (startAfter == null &&
+        !forceRefresh &&
+        _cachedRecentNeeds != null &&
+        _recentNeedsTimestamp != null &&
+        DateTime.now().difference(_recentNeedsTimestamp!) < _cacheTtl) {
+      return _cachedRecentNeeds!;
+    }
+
     try {
       Query<Map<String, dynamic>> query = _needsCollection
           .orderBy('createdAt', descending: true)
@@ -110,9 +132,16 @@ class NeedRepository {
       }
 
       final snapshot = await query.get();
-      return snapshot.docs
+      final results = snapshot.docs
           .map((doc) => NeedModel.fromMap(doc.id, doc.data()))
           .toList(growable: false);
+
+      if (startAfter == null) {
+        _cachedRecentNeeds = results;
+        _recentNeedsTimestamp = DateTime.now();
+      }
+
+      return results;
     } catch (e) {
       debugPrint('NeedRepository.getRecentNeeds error: $e');
       return const [];

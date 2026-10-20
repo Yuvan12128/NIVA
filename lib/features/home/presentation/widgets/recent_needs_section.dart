@@ -109,14 +109,17 @@ class _RecentNeedsSectionState extends State<RecentNeedsSection> {
     _fetchRecentNeeds();
   }
 
-  Future<void> _fetchRecentNeeds() async {
+  Future<void> _fetchRecentNeeds({bool forceRefresh = false}) async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      final models = await _needRepository.getRecentNeeds(limit: 10);
+      final models = await _needRepository.getRecentNeeds(
+        limit: 10,
+        forceRefresh: forceRefresh,
+      );
       if (!mounted) return;
       setState(() {
         _needs = models.map(NeedItem.fromNeedModel).toList(growable: false);

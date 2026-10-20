@@ -117,7 +117,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     _executeSearch();
   }
 
-  Future<void> _executeSearch() async {
+  Future<void> _executeSearch({bool forceRefresh = false}) async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -130,11 +130,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
         blockedIds = await _safetyRepo.getBlockedUserIds(currentUid);
       }
 
+      if (forceRefresh) {
+        SearchService.clearCache();
+      }
+
       final results = await _searchService.searchDiscoveries(
         query: _searchQuery,
         filter: _searchFilter,
         blockedUserIds: blockedIds,
         limit: 30,
+        forceRefresh: forceRefresh,
       );
 
       if (!mounted) return;
@@ -314,7 +319,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: _executeSearch,
+          onRefresh: () => _executeSearch(forceRefresh: true),
           color: AppColors.primaryPurple,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(
