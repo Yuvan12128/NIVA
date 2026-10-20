@@ -9,6 +9,35 @@
       "client_info": {
         "mobilesdk_app_id": "1:152596573565:android:30cf2dbdff74ca7306f014",
         "android_client_info": {
+          "package_name": "com.example.niva"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "152596573565-vrqvo8io33g55h3b1pnsivkir4pnropm.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCTL0lB5B1cWV682IKbXUx459EP-lVYiYU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "152596573565-vrqvo8io33g55h3b1pnsivkir4pnropm.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:152596573565:android:796737e1e63cd1bf06f014",
+        "android_client_info": {
           "package_name": "com.niva.app"
         }
       },

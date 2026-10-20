@@ -10,34 +10,24 @@ service cloud.firestore {
       
       // User can create their own profile document during signup
       // Must not contain private email in public profile
+      // Initial role must be 'member' and trustScore must initialize to 100
       allow create: if request.auth != null
                     && request.auth.uid == userId
                     && (!('email' in request.resource.data))
                     && request.resource.data.trustScore == 100
+                    && request.resource.data.role == 'member'
                     && request.resource.data.createdAt == request.time;
       
       // User can update only their own profile
-      // Cannot add private email, cannot alter trustScore, cannot overwrite createdAt
+      // Cannot add private email, cannot alter trustScore or role, cannot overwrite createdAt
+      // Other users cannot modify this profile (including trustScore)
       allow update: if request.auth != null
                     && request.auth.uid == userId
                     && (!('email' in request.resource.data))
                     && request.resource.data.trustScore == resource.data.trustScore
+                    && request.resource.data.role == resource.data.role
                     && request.resource.data.createdAt == resource.data.createdAt
                     && request.resource.data.updatedAt == request.time;
-
-      // Safe trustScore update strictly from verified reviews
-      // Caller must NOT be the user, must link to an existing verified review document submitted by caller
-      allow update: if request.auth != null
-                    && request.auth.uid != userId
-                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['trustScore', 'updatedAt', 'lastReviewId'])
-                    && request.resource.data.trustScore is int
-                    && request.resource.data.trustScore >= 20
-                    && request.resource.data.trustScore <= 100
-                    && request.resource.data.updatedAt == request.time
-                    && request.resource.data.lastReviewId is string
-                    && exists(/databases/$(database)/documents/reviews/$(request.resource.data.lastReviewId))
-                    && get(/databases/$(database)/documents/reviews/$(request.resource.data.lastReviewId)).data.reviewerId == request.auth.uid
-                    && get(/databases/$(database)/documents/reviews/$(request.resource.data.lastReviewId)).data.revieweeId == userId;
       
       // Prevent deletion of profiles by default
       allow delete: if false;
@@ -55,18 +45,34 @@ service cloud.firestore {
       allow read: if request.auth != null;
 
       // User can create their own need or help document
+      // Title between 1 and 120 chars, description <= 1000 chars, valid status
       allow create: if request.auth != null
                     && request.resource.data.userId == request.auth.uid
                     && request.resource.data.type in ['need', 'help']
                     && request.resource.data.title is string
                     && request.resource.data.title.size() > 0
+                    && request.resource.data.title.size() <= 120
+                    && (!('description' in request.resource.data)
+                        || request.resource.data.description == null
+                        || (request.resource.data.description is string && request.resource.data.description.size() <= 1000))
+                    && (!('status' in request.resource.data)
+                        || request.resource.data.status in ['active', 'completed', 'cancelled'])
                     && request.resource.data.createdAt == request.time;
 
       // Author can update only their own document
-      // userId and createdAt cannot be modified after creation
+      // userId and createdAt cannot be modified; type must remain need/help; status whitelist enforced
       allow update: if request.auth != null
                     && resource.data.userId == request.auth.uid
                     && request.resource.data.userId == resource.data.userId
+                    && request.resource.data.type == resource.data.type
+                    && request.resource.data.type in ['need', 'help']
+                    && request.resource.data.title is string
+                    && request.resource.data.title.size() > 0
+                    && request.resource.data.title.size() <= 120
+                    && (!('description' in request.resource.data)
+                        || request.resource.data.description == null
+                        || (request.resource.data.description is string && request.resource.data.description.size() <= 1000))
+                    && request.resource.data.status in ['active', 'completed', 'cancelled']
                     && request.resource.data.createdAt == resource.data.createdAt
                     && request.resource.data.updatedAt == request.time;
 
@@ -91,9 +97,11 @@ service cloud.firestore {
                     && request.resource.data.createdAt == request.time;
 
       // Only the receiver (toUserId) can accept or decline
+      // Status update must require existing status == 'pending'
       // Core fields and createdAt are immutable
       allow update: if request.auth != null
                     && resource.data.toUserId == request.auth.uid
+                    && resource.data.status == 'pending'
                     && request.resource.data.fromUserId == resource.data.fromUserId
                     && request.resource.data.toUserId == resource.data.toUserId
                     && request.resource.data.needId == resource.data.needId
@@ -134,12 +142,18 @@ service cloud.firestore {
       allow read: if request.auth != null
                   && (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid);
 
-      // Only authenticated sender can send a message
+      // Only authenticated sender who is a participant of the referenced chat can send a message
       allow create: if request.auth != null
                     && request.resource.data.senderId == request.auth.uid
-                    && request.resource.data.receiverId != request.auth.uid
+                    && request.resource.data.senderId != request.resource.data.receiverId
+                    && request.resource.data.chatId is string
+                    && exists(/databases/$(database)/documents/chats/$(request.resource.data.chatId))
+                    && request.auth.uid in get(/databases/$(database)/documents/chats/$(request.resource.data.chatId)).data.participantIds
+                    && request.resource.data.senderId in get(/databases/$(database)/documents/chats/$(request.resource.data.chatId)).data.participantIds
+                    && request.resource.data.receiverId in get(/databases/$(database)/documents/chats/$(request.resource.data.chatId)).data.participantIds
                     && request.resource.data.text is string
                     && request.resource.data.text.size() > 0
+                    && request.resource.data.text.size() <= 2000
                     && request.resource.data.createdAt == request.time;
 
       // Messages are immutable once delivered
@@ -160,18 +174,16 @@ service cloud.firestore {
                     && request.resource.data.senderId == request.auth.uid
                     && request.resource.data.recipientId != request.auth.uid
                     && request.resource.data.type in ['connection_request', 'connection_accepted', 'new_message']
+                    && (!('title' in request.resource.data) || (request.resource.data.title is string && request.resource.data.title.size() <= 80))
+                    && (!('body' in request.resource.data) || (request.resource.data.body is string && request.resource.data.body.size() <= 200))
                     && request.resource.data.isRead == false
                     && request.resource.data.createdAt == request.time;
 
       // Recipient can update isRead status
-      // Core fields (recipientId, senderId, type, referenceId, createdAt) are immutable
+      // Restricted strictly to isRead mutation
       allow update: if request.auth != null
                     && resource.data.recipientId == request.auth.uid
-                    && request.resource.data.recipientId == resource.data.recipientId
-                    && request.resource.data.senderId == resource.data.senderId
-                    && request.resource.data.type == resource.data.type
-                    && request.resource.data.referenceId == resource.data.referenceId
-                    && request.resource.data.createdAt == resource.data.createdAt
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead'])
                     && request.resource.data.isRead is bool;
 
       // Recipient can dismiss/delete their own notifications
@@ -245,6 +257,7 @@ service cloud.firestore {
 
       // Authenticated user can submit a report against another user
       // Cannot report oneself, valid reason, max 500 chars description
+      // Status must initialize to 'submitted'
       allow create: if request.auth != null
                     && request.resource.data.reporterId == request.auth.uid
                     && request.resource.data.reportedUserId != request.auth.uid
@@ -252,6 +265,7 @@ service cloud.firestore {
                     && (!('description' in request.resource.data)
                         || request.resource.data.description == null
                         || (request.resource.data.description is string && request.resource.data.description.size() <= 500))
+                    && request.resource.data.status == 'submitted'
                     && request.resource.data.createdAt == request.time;
 
       // Reports are immutable and cannot be deleted by users

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
+import '../../../core/constants/app_text_styles.dart';
 import '../../../core/widgets/niva_search_bar.dart';
 import '../../auth/data/auth_service.dart';
 import '../../notifications/presentation/notifications_screen.dart';
@@ -67,10 +68,212 @@ class HomeScreen extends StatelessWidget {
                     },
               ),
               const SizedBox(height: AppSpacing.lg),
-              NivaSearchBar(
-                readOnly: true,
-                hintText: 'What do you need today?',
-                onTap: onSearchTap ?? onCreateNeedTap,
+
+              // Hero Connection Studio (Stitch design system)
+              Container(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [
+                      Colors.white,
+                      Colors.white,
+                      AppColors.surfaceLow,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: AppColors.border, width: 1),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x145B4BDB),
+                      blurRadius: 24,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Flexible(
+                                child: Text(
+                                  'What do you need today?',
+                                  style: TextStyle(
+                                    fontFamily: AppTextStyles.fontFamily,
+                                    fontFamilyFallback:
+                                        AppTextStyles.fontFallbacks,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.textPrimary,
+                                    letterSpacing: -0.3,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                width: 24,
+                                height: 24,
+                                decoration: const BoxDecoration(
+                                  color: AppColors.primaryFixed,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.auto_awesome,
+                                  size: 14,
+                                  color: AppColors.primaryPurple,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryPurple.withValues(
+                              alpha: 0.1,
+                            ),
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.radiusFull,
+                            ),
+                          ),
+                          child: const Text(
+                            'Peer Verified',
+                            style: TextStyle(
+                              fontFamily: AppTextStyles.fontFamily,
+                              fontFamilyFallback: AppTextStyles.fontFallbacks,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primaryPurple,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    NivaSearchBar(
+                      readOnly: true,
+                      hintText: 'Find people, services, info...',
+                      onTap: onSearchTap ?? onCreateNeedTap,
+                      onFilterTap: onSearchTap,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    // Dual Primary Intent Modes
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: onCreateNeedTap,
+                              borderRadius: BorderRadius.circular(14),
+                              child: Container(
+                                height: 46,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryPurple,
+                                  borderRadius: BorderRadius.circular(14),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color(0x335B4BDB),
+                                      blurRadius: 12,
+                                      offset: Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.lightbulb_rounded,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                    SizedBox(width: 6),
+                                    Flexible(
+                                      child: Text(
+                                        'I Need',
+                                        style: TextStyle(
+                                          fontFamily: AppTextStyles.fontFamily,
+                                          fontFamilyFallback:
+                                              AppTextStyles.fontFallbacks,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: onCreateNeedTap,
+                              borderRadius: BorderRadius.circular(14),
+                              child: Container(
+                                height: 46,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: AppColors.border),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color(0x0A171725),
+                                      blurRadius: 8,
+                                      offset: Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.volunteer_activism_rounded,
+                                      color: AppColors.tertiary,
+                                      size: 18,
+                                    ),
+                                    SizedBox(width: 6),
+                                    Flexible(
+                                      child: Text(
+                                        'Offer Help',
+                                        style: TextStyle(
+                                          fontFamily: AppTextStyles.fontFamily,
+                                          fontFamilyFallback:
+                                              AppTextStyles.fontFallbacks,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.primaryPurple,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: AppSpacing.xl),
               CategoryGrid(

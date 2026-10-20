@@ -75,7 +75,13 @@ class RecommendedSection extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Text('Recommended for you', style: AppTextStyles.subtitle),
+            const Expanded(
+              child: Text(
+                'Recommended for you',
+                style: AppTextStyles.subtitle,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
             TextButton(onPressed: onSeeAllTap, child: const Text('See all')),
           ],
         ),

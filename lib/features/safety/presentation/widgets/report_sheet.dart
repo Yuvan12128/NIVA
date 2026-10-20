@@ -16,12 +16,14 @@ class ReportSheet extends StatefulWidget {
     required this.reportedUserName,
     this.referenceId,
     this.safetyRepository,
+    this.currentUserId,
   });
 
   final String reportedUserId;
   final String reportedUserName;
   final String? referenceId;
   final SafetyRepository? safetyRepository;
+  final String? currentUserId;
 
   static void show(
     BuildContext context, {
@@ -64,7 +66,8 @@ class _ReportSheetState extends State<ReportSheet> {
   }
 
   Future<void> _submitReport() async {
-    final currentUid = AuthService.instance.currentUser?.uid;
+    final currentUid =
+        widget.currentUserId ?? AuthService.instance.currentUser?.uid;
     if (currentUid == null) {
       setState(() {
         _errorMessage = 'You must be logged in to report a user.';
@@ -120,7 +123,13 @@ class _ReportSheetState extends State<ReportSheet> {
         color: AppColors.card,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: _isSubmitted ? _buildSuccessView() : _buildFormView(),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: _isSubmitted ? _buildSuccessView() : _buildFormView(),
+        ),
+      ),
     );
   }
 
@@ -191,9 +200,12 @@ class _ReportSheetState extends State<ReportSheet> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Report ${widget.reportedUserName}',
-                style: AppTextStyles.h2,
+              Expanded(
+                child: Text(
+                  'Report ${widget.reportedUserName}',
+                  style: AppTextStyles.h2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               IconButton(
                 icon: const Icon(Icons.close_rounded),
@@ -204,130 +216,128 @@ class _ReportSheetState extends State<ReportSheet> {
         ),
         const Divider(height: 1, color: AppColors.borderSubtle),
 
-        Flexible(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (_errorMessage != null)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: AppSpacing.md),
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    decoration: BoxDecoration(
-                      color: AppColors.errorLight,
-                      borderRadius: AppSpacing.borderRadiusMd,
-                      border: Border.all(color: AppColors.error),
-                    ),
-                    child: Text(
-                      _errorMessage!,
-                      style: AppTextStyles.caption.copyWith(
-                        color: AppColors.error,
-                      ),
-                    ),
-                  ),
-
-                const Text(
-                  'Why are you reporting this user?',
-                  style: AppTextStyles.subtitle,
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  'Select the reason that best describes the issue.',
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-
-                // Reason options
-                ...ReportReason.values.map((reason) {
-                  final isSelected = _selectedReason == reason;
-                  return InkWell(
-                    onTap: () => setState(() => _selectedReason = reason),
+        Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_errorMessage != null)
+                Container(
+                  margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: AppColors.errorLight,
                     borderRadius: AppSpacing.borderRadiusMd,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 10,
-                        horizontal: 4,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            isSelected
-                                ? Icons.radio_button_checked_rounded
-                                : Icons.radio_button_off_rounded,
-                            color: isSelected
-                                ? AppColors.primaryPurple
-                                : AppColors.textTertiary,
-                            size: 20,
-                          ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            child: Text(
-                              reason.label,
-                              style: AppTextStyles.bodyMedium.copyWith(
-                                color: isSelected
-                                    ? AppColors.textPrimary
-                                    : AppColors.textSecondary,
-                                fontWeight: isSelected
-                                    ? FontWeight.w600
-                                    : FontWeight.w400,
-                              ),
+                    border: Border.all(color: AppColors.error),
+                  ),
+                  child: Text(
+                    _errorMessage!,
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.error,
+                    ),
+                  ),
+                ),
+
+              const Text(
+                'Why are you reporting this user?',
+                style: AppTextStyles.subtitle,
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'Select the reason that best describes the issue.',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              // Reason options
+              ...ReportReason.values.map((reason) {
+                final isSelected = _selectedReason == reason;
+                return InkWell(
+                  onTap: () => setState(() => _selectedReason = reason),
+                  borderRadius: AppSpacing.borderRadiusMd,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 10,
+                      horizontal: 4,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isSelected
+                              ? Icons.radio_button_checked_rounded
+                              : Icons.radio_button_off_rounded,
+                          color: isSelected
+                              ? AppColors.primaryPurple
+                              : AppColors.textTertiary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: Text(
+                            reason.label,
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: isSelected
+                                  ? AppColors.textPrimary
+                                  : AppColors.textSecondary,
+                              fontWeight: isSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  );
-                }),
-                const SizedBox(height: AppSpacing.lg),
+                  ),
+                );
+              }),
+              const SizedBox(height: AppSpacing.lg),
 
-                // Description text area
-                const Text(
-                  'Additional Details (Optional)',
-                  style: AppTextStyles.subtitle,
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                TextField(
-                  controller: _descController,
-                  maxLength: 500,
-                  maxLines: 3,
-                  style: AppTextStyles.bodyMedium,
-                  decoration: InputDecoration(
-                    hintText: 'Provide any context or explanation to help our review...',
-                    hintStyle: AppTextStyles.caption.copyWith(
-                      color: AppColors.textTertiary,
-                    ),
-                    contentPadding: const EdgeInsets.all(AppSpacing.md),
-                    border: OutlineInputBorder(
-                      borderRadius: AppSpacing.borderRadiusMd,
-                      borderSide: const BorderSide(color: AppColors.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: AppSpacing.borderRadiusMd,
-                      borderSide: const BorderSide(color: AppColors.border),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: AppSpacing.borderRadiusMd,
-                      borderSide: const BorderSide(
-                        color: AppColors.primaryPurple,
-                        width: 1.5,
-                      ),
+              // Description text area
+              const Text(
+                'Additional Details (Optional)',
+                style: AppTextStyles.subtitle,
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              TextField(
+                controller: _descController,
+                maxLength: 500,
+                maxLines: 3,
+                style: AppTextStyles.bodyMedium,
+                decoration: InputDecoration(
+                  hintText: 'Provide any context or explanation to help our review...',
+                  hintStyle: AppTextStyles.caption.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
+                  contentPadding: const EdgeInsets.all(AppSpacing.md),
+                  border: OutlineInputBorder(
+                    borderRadius: AppSpacing.borderRadiusMd,
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: AppSpacing.borderRadiusMd,
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: AppSpacing.borderRadiusMd,
+                    borderSide: const BorderSide(
+                      color: AppColors.primaryPurple,
+                      width: 1.5,
                     ),
                   ),
                 ),
-                const SizedBox(height: AppSpacing.md),
+              ),
+              const SizedBox(height: AppSpacing.md),
 
-                // Submit button
-                NivaButton(
-                  label: _isSubmitting ? 'Submitting...' : 'Submit Report',
-                  isFullWidth: true,
-                  isLoading: _isSubmitting,
-                  onPressed: _isSubmitting ? null : _submitReport,
-                ),
-              ],
-            ),
+              // Submit button
+              NivaButton(
+                label: _isSubmitting ? 'Submitting...' : 'Submit Report',
+                isFullWidth: true,
+                isLoading: _isSubmitting,
+                onPressed: _isSubmitting ? null : _submitReport,
+              ),
+            ],
           ),
         ),
       ],

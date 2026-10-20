@@ -108,56 +108,66 @@ class _NivaBottomBar extends StatelessWidget {
         child: SizedBox(
           height: 64,
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _BarItem(
-                icon: Icons.home_rounded,
-                label: 'Home',
-                isSelected: selectedBarIndex == 0,
-                onTap: () => onTap(0),
+              Expanded(
+                child: _BarItem(
+                  icon: Icons.home_rounded,
+                  label: 'Home',
+                  isSelected: selectedBarIndex == 0,
+                  onTap: () => onTap(0),
+                ),
               ),
-              _BarItem(
-                icon: Icons.search_rounded,
-                label: 'Explore',
-                isSelected: selectedBarIndex == 1,
-                onTap: () => onTap(1),
+              Expanded(
+                child: _BarItem(
+                  icon: Icons.search_rounded,
+                  label: 'Explore',
+                  isSelected: selectedBarIndex == 1,
+                  onTap: () => onTap(1),
+                ),
               ),
               // Central Create "+" Action Button
-              GestureDetector(
-                onTap: () => onTap(2),
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: const BoxDecoration(
-                    color: AppColors.primaryPurple,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Color(0x335B4BDB),
-                        blurRadius: 10,
-                        offset: Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.add_rounded,
-                    color: AppColors.textOnPrimary,
-                    size: 28,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: GestureDetector(
+                  onTap: () => onTap(2),
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: const BoxDecoration(
+                      color: AppColors.primaryPurple,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Color(0x335B4BDB),
+                          blurRadius: 10,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.add_rounded,
+                      color: AppColors.textOnPrimary,
+                      size: 28,
+                    ),
                   ),
                 ),
               ),
-              _BarItem(
-                icon: Icons.chat_bubble_outline_rounded,
-                label: 'Chats',
-                isSelected: selectedBarIndex == 3,
-                onTap: () => onTap(3),
+              Expanded(
+                child: _BarItem(
+                  icon: Icons.chat_bubble_outline_rounded,
+                  label: 'Chats',
+                  isSelected: selectedBarIndex == 3,
+                  onTap: () => onTap(3),
+                ),
               ),
-              _BarItem(
-                icon: Icons.person_outline_rounded,
-                label: 'Profile',
-                isSelected: selectedBarIndex == 4,
-                onTap: () => onTap(4),
+              Expanded(
+                child: _BarItem(
+                  icon: Icons.person_outline_rounded,
+                  label: 'Profile',
+                  isSelected: selectedBarIndex == 4,
+                  onTap: () => onTap(4),
+                ),
               ),
             ],
           ),
@@ -193,7 +203,7 @@ class _BarItem extends StatelessWidget {
           minHeight: AppSpacing.minTouchTarget,
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,

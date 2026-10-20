@@ -160,6 +160,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
     _executeSearch();
   }
 
+  void _onTypeFilterTap(String? type) {
+    final newType = (_searchFilter.type == type) ? null : type;
+    setState(() {
+      _searchFilter = _searchFilter.copyWith(type: () => newType);
+    });
+    _executeSearch();
+  }
+
   void _applyQuickSearch(String term) {
     _debounceTimer?.cancel();
     setState(() {
@@ -319,15 +327,57 @@ class _ExploreScreenState extends State<ExploreScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. Header
-                const Text('Explore', style: AppTextStyles.h1),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  'Discover people, knowledge, opportunities and more.',
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.textSecondary,
-                    fontSize: 15,
-                  ),
+                // 1. Header with Location Badge
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Explore', style: AppTextStyles.h1),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            'Discover people, knowledge, opportunities and more.',
+                            style: AppTextStyles.caption.copyWith(
+                              color: AppColors.textSecondary,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryFixed,
+                        borderRadius: AppSpacing.borderRadiusFull,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.location_on_rounded,
+                            size: 14,
+                            color: AppColors.primaryPurple,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Bengaluru, IN',
+                            style: AppTextStyles.captionSmall.copyWith(
+                              color: AppColors.primaryPurple,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: AppSpacing.lg),
 
@@ -452,23 +502,83 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   selectedType: _searchFilter.category,
                   onSelectType: _onCategoryFilterTap,
                 ),
-                const SizedBox(height: AppSpacing.xxl),
+                const SizedBox(height: AppSpacing.md),
 
-                // 4. Discoveries Header & Result Count
+                // 4. Intent Filter Pills (Type Row: All Types, I Need, I Can Help)
+                _IntentFilterRow(
+                  selectedType: _searchFilter.type,
+                  onSelectType: _onTypeFilterTap,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+
+                // 5. Discoveries Header & Result Count + Live Matching
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      isFiltering
-                          ? 'Discovery Results (${_discoveries.length})'
-                          : 'Suggested Discoveries',
-                      style: AppTextStyles.subtitle,
-                    ),
-                    if (isFiltering)
-                      TextButton(
-                        onPressed: _clearFilters,
-                        child: const Text('Reset'),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isFiltering
+                                ? 'Discovery Results (${_discoveries.length})'
+                                : 'Suggested Discoveries',
+                            style: AppTextStyles.subtitle,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Showing ${_discoveries.length} matches near you',
+                            style: AppTextStyles.captionSmall.copyWith(
+                              color: AppColors.textTertiary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                       ),
+                    ),
+                    Row(
+                      children: [
+                        if (isFiltering)
+                          TextButton(
+                            onPressed: _clearFilters,
+                            child: const Text('Reset'),
+                          )
+                        else
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceLow,
+                              borderRadius: AppSpacing.borderRadiusFull,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.primaryPurple,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  'Live Matching',
+                                  style: AppTextStyles.captionSmall.copyWith(
+                                    color: AppColors.primaryPurple,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.sm),
@@ -821,6 +931,128 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
+/// Segmented row for switching intent: All Types, I Need, I Can Help.
+class _IntentFilterRow extends StatelessWidget {
+  const _IntentFilterRow({
+    required this.selectedType,
+    required this.onSelectType,
+  });
+
+  final String? selectedType;
+  final ValueChanged<String?> onSelectType;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLow,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _IntentSegment(
+              label: 'All Types',
+              isSelected: selectedType == null,
+              onTap: () => onSelectType(null),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: _IntentSegment(
+              label: 'I Need',
+              hasDot: true,
+              dotColor: AppColors.primaryPurple,
+              isSelected: selectedType == 'need',
+              onTap: () => onSelectType('need'),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: _IntentSegment(
+              label: 'I Can Help',
+              hasDot: true,
+              dotColor: const Color(0xFF059669),
+              isSelected: selectedType == 'help',
+              onTap: () => onSelectType('help'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IntentSegment extends StatelessWidget {
+  const _IntentSegment({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+    this.hasDot = false,
+    this.dotColor,
+  });
+
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final bool hasDot;
+  final Color? dotColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.card : Colors.transparent,
+          borderRadius: BorderRadius.circular(9),
+          boxShadow: isSelected
+              ? const [
+                  BoxShadow(
+                    color: Color(0x0C000000),
+                    blurRadius: 4,
+                    offset: Offset(0, 1),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (hasDot && dotColor != null) ...[
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: dotColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 5),
+            ],
+            Flexible(
+              child: Text(
+                label,
+                style: AppTextStyles.captionSmall.copyWith(
+                  color: isSelected
+                      ? AppColors.primaryPurple
+                      : AppColors.textSecondary,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 12,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Universal Discovery Card communicating its solution type visually.
 class _DiscoveryCard extends StatelessWidget {
   const _DiscoveryCard({required this.item, required this.onTap});
@@ -830,97 +1062,220 @@ class _DiscoveryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasItemTypeBadge = item.itemType == 'need' || item.itemType == 'help';
-    final itemTypeBadgeLabel = item.itemType == 'need'
-        ? 'I Need'
-        : 'I Can Help';
+    final isHelp = item.itemType == 'help';
+    final isNeed = item.itemType == 'need';
 
     return Container(
       decoration: BoxDecoration(
         color: AppColors.card,
-        borderRadius: AppSpacing.borderRadiusLg,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.borderSubtle, width: 1),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A5B4BDB),
+            blurRadius: 18,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: AppSpacing.borderRadiusLg,
+          borderRadius: BorderRadius.circular(20),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.lg),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top Row: Category Type Badge + Optional Need/Help Badge + Meta/Location
+                // Top Row: Creator Profile + Trust Score & Intent Pill
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: item.type.backgroundColor,
-                            borderRadius: AppSpacing.borderRadiusSm,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Stack(
+                            clipBehavior: Clip.none,
                             children: [
-                              Icon(
-                                item.type.icon,
-                                color: item.type.iconColor,
-                                size: 14,
+                              NivaAvatar(
+                                name: item.authorName ?? item.title,
+                                size: 40,
+                                backgroundColor: item.type.backgroundColor,
+                                textColor: item.type.iconColor,
                               ),
-                              const SizedBox(width: 4),
-                              Text(
-                                item.type.label,
-                                style: AppTextStyles.captionSmall.copyWith(
-                                  color: item.type.iconColor,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 11.5,
+                              Positioned(
+                                bottom: -2,
+                                right: -2,
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: BoxDecoration(
+                                      color: isHelp
+                                          ? const Color(0xFF10B981)
+                                          : AppColors.primaryPurple,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.check_rounded,
+                                      size: 8,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                        if (hasItemTypeBadge) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: item.itemType == 'need'
-                                  ? AppColors.errorLight
-                                  : AppColors.successLight,
-                              borderRadius: AppSpacing.borderRadiusSm,
-                            ),
-                            child: Text(
-                              itemTypeBadgeLabel,
-                              style: AppTextStyles.captionSmall.copyWith(
-                                color: item.itemType == 'need'
-                                    ? AppColors.error
-                                    : AppColors.success,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 10.5,
-                              ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        item.authorName ?? item.title,
+                                        style: AppTextStyles.bodyMedium
+                                            .copyWith(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 14,
+                                            ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(
+                                      Icons.verified_rounded,
+                                      size: 14,
+                                      color: AppColors.primaryPurple,
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.shield_outlined,
+                                      size: 12,
+                                      color: AppColors.primaryPurple,
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Flexible(
+                                      child: Text(
+                                        '${item.trustScore ?? 96}% Trust Index',
+                                        style: AppTextStyles.captionSmall
+                                            .copyWith(
+                                              color: AppColors.textSecondary,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
                         ],
-                      ],
-                    ),
-                    Text(
-                      '${item.location} • ${item.meta}',
-                      style: AppTextStyles.captionSmall.copyWith(
-                        color: AppColors.textTertiary,
-                        fontSize: 12,
                       ),
                     ),
+                    const SizedBox(width: AppSpacing.sm),
+                    // Intent Pill on Right
+                    if (isHelp)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFECFDF5),
+                          borderRadius: AppSpacing.borderRadiusFull,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF059669),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            const Text(
+                              'I Can Help',
+                              style: TextStyle(
+                                color: Color(0xFF047857),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else if (isNeed)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryFixed,
+                          borderRadius: AppSpacing.borderRadiusFull,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                color: AppColors.primaryPurple,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            const Text(
+                              'I Need',
+                              style: TextStyle(
+                                color: AppColors.primaryPurple,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: item.type.backgroundColor,
+                          borderRadius: AppSpacing.borderRadiusFull,
+                        ),
+                        child: Text(
+                          item.type.label,
+                          style: TextStyle(
+                            color: item.type.iconColor,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -929,8 +1284,9 @@ class _DiscoveryCard extends StatelessWidget {
                 Text(
                   item.title,
                   style: AppTextStyles.subtitle.copyWith(
-                    fontSize: 16.5,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    height: 1.3,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -946,100 +1302,125 @@ class _DiscoveryCard extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.md),
 
-                // Bottom Row: Author + Trust Score & Action Button
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                // Attributes Strip
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 6,
+                  runSpacing: 4,
                   children: [
-                    if (item.authorName != null)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          NivaAvatar(
-                            name: item.authorName!,
-                            size: 26,
-                            backgroundColor: item.type.backgroundColor,
-                            textColor: item.type.iconColor,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceLow,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        item.type.label,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.bolt_rounded,
+                          size: 14,
+                          color: AppColors.secondaryPurple,
+                        ),
+                        const SizedBox(width: 3),
+                        const Text(
+                          'Available today',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: AppColors.secondaryPurple,
+                            fontWeight: FontWeight.w600,
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            item.authorName!,
-                            style: AppTextStyles.captionSmall.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                            ),
+                        ),
+                      ],
+                    ),
+                    const Text('•', style: TextStyle(color: AppColors.border)),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.location_on_outlined,
+                          size: 14,
+                          color: AppColors.textTertiary,
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          item.location,
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            color: AppColors.textTertiary,
                           ),
-                          if (item.trustScore != null) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.servicesBg,
-                                borderRadius: AppSpacing.borderRadiusSm,
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.shield_outlined,
-                                    size: 11,
-                                    color: AppColors.primaryPurple,
-                                  ),
-                                  const SizedBox(width: 2),
-                                  Text(
-                                    '${item.trustScore}',
-                                    style: AppTextStyles.captionSmall.copyWith(
-                                      color: AppColors.primaryPurple,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 10.5,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ],
-                      )
-                    else if (item.tags.isNotEmpty)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: item.tags
-                            .take(2)
-                            .map((tag) {
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 6),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 7,
-                                    vertical: 2,
-                                  ),
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.surfaceMuted,
-                                    borderRadius: AppSpacing.borderRadiusSm,
-                                  ),
-                                  child: Text(
-                                    tag,
-                                    style: AppTextStyles.captionSmall.copyWith(
-                                      fontSize: 11,
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            })
-                            .toList(growable: false),
-                      )
-                    else
-                      const SizedBox.shrink(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
 
-                    // Clean Action Button
-                    NivaButton(
-                      label: item.actionLabel,
-                      variant: NivaButtonVariant.secondary,
-                      height: 36,
-                      onPressed: onTap,
+                // Bottom Action Buttons: View Details & Connect
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: AppColors.surfaceLow,
+                          foregroundColor: AppColors.primaryPurple,
+                          side: BorderSide.none,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                        onPressed: onTap,
+                        child: const Text(
+                          'View Details',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryPurple,
+                          foregroundColor: AppColors.textOnPrimary,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                        onPressed: onTap,
+                        icon: Icon(
+                          isNeed
+                              ? Icons.handshake_outlined
+                              : Icons.send_rounded,
+                          size: 15,
+                        ),
+                        label: Text(
+                          item.actionLabel,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),

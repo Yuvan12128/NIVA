@@ -180,7 +180,13 @@ class _ReviewSheetState extends State<ReviewSheet> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('Leave Review', style: AppTextStyles.h2),
+            const Expanded(
+              child: Text(
+                'Leave Review',
+                style: AppTextStyles.h2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
             IconButton(
               icon: const Icon(Icons.close_rounded, size: 22),
               onPressed: () => Navigator.pop(context),
@@ -207,8 +213,13 @@ class _ReviewSheetState extends State<ReviewSheet> {
                   final starNum = index + 1;
                   final isSelected = starNum <= _selectedRating;
                   return IconButton(
-                    iconSize: 38,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    iconSize: 32,
+                    visualDensity: VisualDensity.compact,
+                    constraints: const BoxConstraints(
+                      minWidth: 40,
+                      minHeight: 40,
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
                     onPressed: () {
                       setState(() {
                         _selectedRating = starNum;

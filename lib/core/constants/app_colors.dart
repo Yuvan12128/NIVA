@@ -5,23 +5,32 @@ import 'package:flutter/material.dart';
 abstract final class AppColors {
   // Brand Colors
   static const Color primaryPurple = Color(0xFF5B4BDB);
+  static const Color primaryDeep = Color(0xFF422EC2);
+  static const Color primaryFixed = Color(0xFFE4DFFF);
+  static const Color onPrimaryFixed = Color(0xFF150066);
   static const Color secondaryPurple = Color(0xFF6C63FF);
+  static const Color secondaryFixed = Color(0xFFE3DFFF);
   static const Color blue = Color(0xFF3B82F6);
+  static const Color tertiary = Color(0xFF00479C);
+  static const Color tertiaryFixed = Color(0xFFD8E2FF);
 
-  // Surface & Canvas
-  static const Color background = Color(0xFFF8F9FC);
+  // Surface & Canvas (Stitch design system)
+  static const Color background = Color(0xFFFCF8FF);
   static const Color card = Color(0xFFFFFFFF);
-  static const Color surfaceMuted = Color(0xFFF1F3F9);
+  static const Color surfaceLow = Color(0xFFF5F2FF);
+  static const Color surfaceMuted = Color(0xFFEFECFF);
+  static const Color surfaceHigh = Color(0xFFE9E6FA);
+  static const Color surfaceHighest = Color(0xFFE3E0F4);
 
   // Text Colors
-  static const Color textPrimary = Color(0xFF171725);
-  static const Color textSecondary = Color(0xFF6B7280);
-  static const Color textTertiary = Color(0xFF9CA3AF);
+  static const Color textPrimary = Color(0xFF1A1A28);
+  static const Color textSecondary = Color(0xFF474554);
+  static const Color textTertiary = Color(0xFF787586);
   static const Color textOnPrimary = Color(0xFFFFFFFF);
 
   // Borders & Dividers
   static const Color border = Color(0xFFE5E7EB);
-  static const Color borderSubtle = Color(0xFFF0F2F5);
+  static const Color borderSubtle = Color(0xFFC8C4D7);
 
   // Semantic Status
   static const Color success = Color(0xFF16A34A);

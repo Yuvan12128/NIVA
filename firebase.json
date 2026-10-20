@@ -7,7 +7,7 @@
       "android": {
         "default": {
           "projectId": "niva-discovery-1792429167",
-          "appId": "1:152596573565:android:30cf2dbdff74ca7306f014",
+          "appId": "1:152596573565:android:796737e1e63cd1bf06f014",
           "fileOutput": "android/app/google-services.json"
         }
       },
@@ -15,7 +15,7 @@
         "lib/firebase_options.dart": {
           "projectId": "niva-discovery-1792429167",
           "configurations": {
-            "android": "1:152596573565:android:30cf2dbdff74ca7306f014",
+            "android": "1:152596573565:android:796737e1e63cd1bf06f014",
             "web": "1:152596573565:web:ed611ef4167d67cb06f014"
           }
         }

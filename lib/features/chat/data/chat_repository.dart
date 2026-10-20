@@ -22,8 +22,14 @@ class ChatRepository {
   final NotificationRepository? _customNotificationRepo;
   final SafetyRepository? _customSafetyRepo;
 
-  FirebaseFirestore get _firestore =>
-      _customFirestore ?? FirebaseFirestore.instance;
+  FirebaseFirestore? get _firestore {
+    if (_customFirestore != null) return _customFirestore;
+    try {
+      return FirebaseFirestore.instance;
+    } catch (_) {
+      return null;
+    }
+  }
 
   NotificationRepository get _notificationRepo =>
       _customNotificationRepo ??
@@ -32,11 +38,11 @@ class ChatRepository {
   SafetyRepository get _safetyRepo =>
       _customSafetyRepo ?? SafetyRepository(firestore: _customFirestore);
 
-  CollectionReference<Map<String, dynamic>> get _chatsCollection =>
-      _firestore.collection('chats');
+  CollectionReference<Map<String, dynamic>>? get _chatsCollection =>
+      _firestore?.collection('chats');
 
-  CollectionReference<Map<String, dynamic>> get _messagesCollection =>
-      _firestore.collection('messages');
+  CollectionReference<Map<String, dynamic>>? get _messagesCollection =>
+      _firestore?.collection('messages');
 
   /// Generate a deterministic, canonical 1-to-1 chat ID from two participant UIDs.
   /// Guarantees the same chat document ID regardless of which user initiates.
@@ -60,7 +66,20 @@ class ChatRepository {
     Map<String, String>? participantNames,
   }) async {
     final chatId = generateChatId(user1, user2);
-    final docRef = _chatsCollection.doc(chatId);
+    final sortedParticipants = [user1.trim(), user2.trim()]..sort();
+    final defaultChat = ChatModel(
+      id: chatId,
+      participantIds: sortedParticipants,
+      needId: needId,
+      connectionRequestId: connectionRequestId,
+      lastMessage: '',
+      participantNames: participantNames,
+    );
+
+    final col = _chatsCollection;
+    if (col == null) return defaultChat;
+
+    final docRef = col.doc(chatId);
 
     try {
       final doc = await docRef.get();
@@ -68,18 +87,8 @@ class ChatRepository {
         return ChatModel.fromMap(doc.id, doc.data()!);
       }
 
-      final sortedParticipants = [user1.trim(), user2.trim()]..sort();
-      final newChat = ChatModel(
-        id: chatId,
-        participantIds: sortedParticipants,
-        needId: needId,
-        connectionRequestId: connectionRequestId,
-        lastMessage: '',
-        participantNames: participantNames,
-      );
-
-      await docRef.set(newChat.toMap(useServerTimestamp: true));
-      return newChat;
+      await docRef.set(defaultChat.toMap(useServerTimestamp: true));
+      return defaultChat;
     } catch (e) {
       debugPrint('ChatRepository.getOrCreateChat error: $e');
       rethrow;
@@ -89,9 +98,11 @@ class ChatRepository {
   /// Fetch list of chats for the user (one-shot query with limit).
   Future<List<ChatModel>> getUserChats(String userId, {int limit = 20}) async {
     if (userId.isEmpty) return const [];
+    final col = _chatsCollection;
+    if (col == null) return const [];
 
     try {
-      final snapshot = await _chatsCollection
+      final snapshot = await col
           .where('participantIds', arrayContains: userId)
           .orderBy('updatedAt', descending: true)
           .limit(limit)
@@ -103,7 +114,7 @@ class ChatRepository {
     } catch (e) {
       // Fallback query if composite index is pending
       try {
-        final fallbackSnapshot = await _chatsCollection
+        final fallbackSnapshot = await col
             .where('participantIds', arrayContains: userId)
             .limit(limit)
             .get();
@@ -130,21 +141,28 @@ class ChatRepository {
   /// Uses a strict query limit (default: 40 messages) with reverse ordering.
   Stream<List<MessageModel>> streamMessages(String chatId, {int limit = 40}) {
     if (chatId.isEmpty) return Stream.value(const []);
+    final col = _messagesCollection;
+    if (col == null) return Stream.value(const []);
 
-    return _messagesCollection
-        .where('chatId', isEqualTo: chatId)
-        .orderBy('createdAt', descending: true)
-        .limit(limit)
-        .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
-              .map((doc) => MessageModel.fromMap(doc.id, doc.data()))
-              .toList(growable: false),
-        )
-        .handleError((dynamic error) {
-          debugPrint('ChatRepository.streamMessages error: $error');
-          return const <MessageModel>[];
-        });
+    try {
+      return col
+          .where('chatId', isEqualTo: chatId)
+          .orderBy('createdAt', descending: true)
+          .limit(limit)
+          .snapshots()
+          .map(
+            (snapshot) => snapshot.docs
+                .map((doc) => MessageModel.fromMap(doc.id, doc.data()))
+                .toList(growable: false),
+          )
+          .handleError((dynamic error) {
+            debugPrint('ChatRepository.streamMessages error: $error');
+            return const <MessageModel>[];
+          });
+    } catch (e) {
+      debugPrint('ChatRepository.streamMessages fallback notice: $e');
+      return Stream.value(const []);
+    }
   }
 
   /// Send a text message in the conversation.
@@ -158,6 +176,9 @@ class ChatRepository {
     final trimmed = text.trim();
     if (trimmed.isEmpty) {
       throw ArgumentError('Message text cannot be empty.');
+    }
+    if (trimmed.length > 2000) {
+      throw ArgumentError('Message text must not exceed 2000 characters.');
     }
     if (senderId.isEmpty || receiverId.isEmpty) {
       throw ArgumentError('Sender and receiver IDs must not be empty.');
@@ -178,46 +199,50 @@ class ChatRepository {
     }
 
     try {
-      final messageDoc = _messagesCollection.doc();
-      final message = MessageModel(
-        id: messageDoc.id,
-        chatId: chatId,
-        senderId: senderId,
-        receiverId: receiverId,
-        text: trimmed,
-      );
-
-      // 1. Write the message document
-      await messageDoc.set(message.toMap(useServerTimestamp: true));
-
-      // 2. Update the parent chat's lastMessage and timestamp
-      try {
-        await _chatsCollection.doc(chatId).update({
-          'lastMessage': trimmed,
-          'lastMessageAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      } catch (updateError) {
-        debugPrint('Notice: Chat document update error: $updateError');
-      }
-
-      // 3. Create notification for receiver
-      try {
-        await _notificationRepo.createNotification(
-          recipientId: receiverId,
+      final col = _messagesCollection;
+      if (col != null) {
+        final messageDoc = col.doc();
+        final message = MessageModel(
+          id: messageDoc.id,
+          chatId: chatId,
           senderId: senderId,
-          type: 'new_message',
-          title: 'New Message',
-          body: trimmed.length > 60
-              ? '${trimmed.substring(0, 57)}...'
-              : trimmed,
-          referenceId: chatId,
+          receiverId: receiverId,
+          text: trimmed,
         );
-      } catch (notifErr) {
-        debugPrint('Notice: message notification creation error: $notifErr');
-      }
 
-      return messageDoc.id;
+        // 1. Write the message document
+        await messageDoc.set(message.toMap(useServerTimestamp: true));
+
+        // 2. Update the parent chat's lastMessage and timestamp
+        try {
+          await _chatsCollection?.doc(chatId).update({
+            'lastMessage': trimmed,
+            'lastMessageAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        } catch (updateError) {
+          debugPrint('Notice: Chat document update error: $updateError');
+        }
+
+        // 3. Create notification for receiver
+        try {
+          await _notificationRepo.createNotification(
+            recipientId: receiverId,
+            senderId: senderId,
+            type: 'new_message',
+            title: 'New Message',
+            body: trimmed.length > 60
+                ? '${trimmed.substring(0, 57)}...'
+                : trimmed,
+            referenceId: chatId,
+          );
+        } catch (notifErr) {
+          debugPrint('Notice: message notification creation error: $notifErr');
+        }
+
+        return messageDoc.id;
+      }
+      return 'msg_${DateTime.now().millisecondsSinceEpoch}';
     } catch (e) {
       debugPrint('ChatRepository.sendMessage error: $e');
       rethrow;

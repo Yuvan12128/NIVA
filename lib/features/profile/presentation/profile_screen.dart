@@ -168,10 +168,14 @@ class ProfileScreen extends StatelessWidget {
                           color: AppColors.textTertiary,
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          'Chennai (Remote flexible)',
-                          style: AppTextStyles.captionSmall.copyWith(
-                            color: AppColors.textTertiary,
+                        Expanded(
+                          child: Text(
+                            'Chennai (Remote flexible)',
+                            style: AppTextStyles.captionSmall.copyWith(
+                              color: AppColors.textTertiary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -185,10 +189,14 @@ class ProfileScreen extends StatelessWidget {
                           color: AppColors.textTertiary,
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          'English, Tamil',
-                          style: AppTextStyles.captionSmall.copyWith(
-                            color: AppColors.textTertiary,
+                        Expanded(
+                          child: Text(
+                            'English, Tamil',
+                            style: AppTextStyles.captionSmall.copyWith(
+                              color: AppColors.textTertiary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -320,10 +328,14 @@ class ProfileScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 6),
-                    Text(
-                      'Available for discovery',
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        fontWeight: FontWeight.w600,
+                    Expanded(
+                      child: Text(
+                        'Available for discovery',
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -334,6 +346,8 @@ class ProfileScreen extends StatelessWidget {
                   style: AppTextStyles.captionSmall.copyWith(
                     color: AppColors.textSecondary,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -430,7 +444,14 @@ class ProfileScreen extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('I Can Help With', style: AppTextStyles.subtitle),
+            const Expanded(
+              child: Text(
+                'I Can Help With',
+                style: AppTextStyles.subtitle,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: const BoxDecoration(
@@ -455,6 +476,11 @@ class ProfileScreen extends StatelessWidget {
           children: _helpCapabilities
               .map((capability) {
                 return Container(
+                  constraints: BoxConstraints(
+                    maxWidth:
+                        MediaQuery.of(context).size.width -
+                        AppSpacing.screenHorizontal * 2,
+                  ),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
                     vertical: 8,
@@ -473,11 +499,14 @@ class ProfileScreen extends StatelessWidget {
                         size: 15,
                       ),
                       const SizedBox(width: 6),
-                      Text(
-                        capability,
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w500,
+                      Flexible(
+                        child: Text(
+                          capability,
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],

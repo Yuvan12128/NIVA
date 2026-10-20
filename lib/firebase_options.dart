@@ -60,7 +60,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCTL0lB5B1cWV682IKbXUx459EP-lVYiYU',
-    appId: '1:152596573565:android:30cf2dbdff74ca7306f014',
+    appId: '1:152596573565:android:796737e1e63cd1bf06f014',
     messagingSenderId: '152596573565',
     projectId: 'niva-discovery-1792429167',
     storageBucket: 'niva-discovery-1792429167.firebasestorage.app',

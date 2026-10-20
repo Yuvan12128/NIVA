@@ -336,93 +336,181 @@ class _NeedCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.card,
-        borderRadius: AppSpacing.borderRadiusLg,
-        border: Border.all(color: AppColors.borderSubtle, width: 1),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border, width: 1),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F5B4BDB),
+            blurRadius: 20,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: AppSpacing.borderRadiusLg,
+          borderRadius: BorderRadius.circular(18),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.md),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                NivaAvatar(
-                  name: need.authorName,
-                  size: 42,
-                  backgroundColor: need.tagBg,
-                  textColor: need.tagColor,
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        need.title,
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14.5,
+                // Top row: Avatar + Name + Verified + Time/Location + Trust Pill
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Row(
+                      children: [
+                        NivaAvatar(
+                          name: need.authorName,
+                          size: 38,
+                          backgroundColor: need.tagBg,
+                          textColor: need.tagColor,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
+                        const SizedBox(width: AppSpacing.sm),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  need.authorName,
+                                  style: AppTextStyles.bodyBold.copyWith(
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(
+                                  Icons.verified_rounded,
+                                  size: 14,
+                                  color: AppColors.primaryPurple,
+                                ),
+                              ],
                             ),
-                            decoration: BoxDecoration(
-                              color: need.tagBg,
-                              borderRadius: AppSpacing.borderRadiusSm,
-                            ),
-                            child: Text(
-                              need.category,
-                              style: AppTextStyles.captionSmall.copyWith(
-                                color: need.tagColor,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: Text(
+                            Text(
                               '${need.location} • ${need.timeAgo}',
                               style: AppTextStyles.captionSmall.copyWith(
-                                color: AppColors.textTertiary,
-                                fontSize: 11.5,
+                                color: AppColors.textSecondary,
+                                fontSize: 11,
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceLow,
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusFull,
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.shield_rounded,
+                            size: 12,
+                            color: AppColors.primaryPurple,
+                          ),
+                          SizedBox(width: 3),
+                          Text(
+                            '98% Trust',
+                            style: TextStyle(
+                              fontFamily: AppTextStyles.fontFamily,
+                              fontFamilyFallback: AppTextStyles.fontFallbacks,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primaryPurple,
                             ),
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.chat_bubble_outline_rounded,
-                      size: 15,
-                      color: AppColors.textTertiary,
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${need.responsesCount}',
-                      style: AppTextStyles.captionSmall.copyWith(
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                // Title
+                Text(
+                  need.title,
+                  style: AppTextStyles.bodyBold.copyWith(
+                    fontSize: 14.5,
+                    height: 1.3,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                // Bottom row: Category badge + "I Can Help" button
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceHigh,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: need.tagColor,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            need.category,
+                            style: AppTextStyles.captionSmall.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryFixed.withValues(alpha: 0.8),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.handshake_rounded,
+                            size: 14,
+                            color: AppColors.onPrimaryFixed,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            'I Can Help',
+                            style: TextStyle(
+                              fontFamily: AppTextStyles.fontFamily,
+                              fontFamilyFallback: AppTextStyles.fontFallbacks,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.onPrimaryFixed,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],

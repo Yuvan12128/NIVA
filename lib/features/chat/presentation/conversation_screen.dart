@@ -190,30 +190,77 @@ class _ConversationScreenState extends State<ConversationScreen> {
         titleSpacing: 0,
         title: Row(
           children: [
-            NivaAvatar(
-              name: widget.otherUserName,
-              size: 36,
-              backgroundColor: AppColors.servicesBg,
-              textColor: AppColors.primaryPurple,
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                NivaAvatar(
+                  name: widget.otherUserName,
+                  size: 38,
+                  backgroundColor: AppColors.servicesBg,
+                  textColor: AppColors.primaryPurple,
+                ),
+                Positioned(
+                  bottom: -1,
+                  right: -1,
+                  child: Container(
+                    width: 11,
+                    height: 11,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    widget.otherUserName,
-                    style: AppTextStyles.h2.copyWith(fontSize: 16),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          widget.otherUserName,
+                          style: AppTextStyles.h2.copyWith(fontSize: 16),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.verified_rounded,
+                        size: 14,
+                        color: AppColors.primaryPurple,
+                      ),
+                    ],
+                  ),
+                  const Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: 'Available',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF059669),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        TextSpan(
+                          text: ' • 98% Trust Score',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                  ),
-                  const Text(
-                    'Direct Connection',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textTertiary,
-                      fontWeight: FontWeight.w500,
-                    ),
                   ),
                 ],
               ),
@@ -221,6 +268,29 @@ class _ConversationScreenState extends State<ConversationScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: const BoxDecoration(
+                color: AppColors.surfaceLow,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.call_rounded,
+                size: 16,
+                color: AppColors.primaryPurple,
+              ),
+            ),
+            tooltip: 'Audio Call',
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Audio call connected via NIVA peer audio.'),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(
               Icons.star_outline_rounded,
@@ -312,6 +382,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // Contextual Request Banner
+            _ContextualRequestBanner(
+              needId: widget.chat.needId,
+              otherUserName: widget.otherUserName,
+            ),
+
             // Messages Stream
             Expanded(
               child: StreamBuilder<List<MessageModel>>(
@@ -354,40 +430,46 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
                   // 3. Empty state
                   if (messages.isEmpty) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.xxl),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 52,
-                              height: 52,
-                              decoration: const BoxDecoration(
-                                color: AppColors.servicesBg,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.chat_bubble_outline_rounded,
-                                color: AppColors.primaryPurple,
-                                size: 26,
-                              ),
+                    return SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.screenHorizontal,
+                        vertical: AppSpacing.md,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _SystemMatchCard(
+                            otherUserName: widget.otherUserName,
+                          ),
+                          const SizedBox(height: AppSpacing.xxl),
+                          Container(
+                            width: 52,
+                            height: 52,
+                            decoration: const BoxDecoration(
+                              color: AppColors.servicesBg,
+                              shape: BoxShape.circle,
                             ),
-                            const SizedBox(height: AppSpacing.md),
-                            const Text(
-                              'No messages yet',
-                              style: AppTextStyles.subtitle,
+                            child: const Icon(
+                              Icons.chat_bubble_outline_rounded,
+                              color: AppColors.primaryPurple,
+                              size: 26,
                             ),
-                            const SizedBox(height: AppSpacing.xs),
-                            Text(
-                              'Say hello to ${widget.otherUserName} regarding your connection!',
-                              style: AppTextStyles.captionSmall.copyWith(
-                                color: AppColors.textSecondary,
-                              ),
-                              textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          const Text(
+                            'No messages yet',
+                            style: AppTextStyles.subtitle,
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            'Say hello to ${widget.otherUserName} regarding your connection!',
+                            style: AppTextStyles.captionSmall.copyWith(
+                              color: AppColors.textSecondary,
                             ),
-                          ],
-                        ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ),
                     );
                   }
@@ -401,16 +483,39 @@ class _ConversationScreenState extends State<ConversationScreen> {
                       horizontal: AppSpacing.screenHorizontal,
                       vertical: AppSpacing.md,
                     ),
-                    itemCount: messages.length,
+                    itemCount: messages.length + 1,
                     itemBuilder: (context, index) {
+                      if (index == messages.length) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                          child: _SystemMatchCard(
+                            otherUserName: widget.otherUserName,
+                          ),
+                        );
+                      }
                       final message = messages[index];
                       final isMe = message.senderId == currentUserId;
-                      return _MessageBubble(message: message, isMe: isMe);
+                      return _MessageBubble(
+                        message: message,
+                        isMe: isMe,
+                        otherUserName: widget.otherUserName,
+                      );
                     },
                   );
                 },
               ),
             ),
+
+            // Quick Replies Pill Carousel
+            if (!_isBlocked)
+              _QuickRepliesCarousel(
+                onSelectReply: (reply) {
+                  _textController.text = reply;
+                  _textController.selection = TextSelection.fromPosition(
+                    TextPosition(offset: _textController.text.length),
+                  );
+                },
+              ),
 
             // Input Bar or Blocked Notification Banner
             if (_isBlocked)
@@ -459,43 +564,100 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 ),
                 child: Row(
                   children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _textController,
-                        textCapitalization: TextCapitalization.sentences,
-                        maxLines: 4,
-                        minLines: 1,
-                        style: AppTextStyles.bodyMedium,
-                        decoration: const InputDecoration(
-                          hintText: 'Type a message...',
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: AppSpacing.md,
-                            vertical: 10,
+                    // Media triggers
+                    IconButton(
+                      icon: const Icon(
+                        Icons.add_circle_outline_rounded,
+                        color: AppColors.textSecondary,
+                        size: 24,
+                      ),
+                      tooltip: 'Attachment',
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('File attachments supported.'),
+                            duration: Duration(seconds: 1),
+                            behavior: SnackBarBehavior.floating,
                           ),
-                          border: InputBorder.none,
+                        );
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.photo_camera_outlined,
+                        color: AppColors.textSecondary,
+                        size: 22,
+                      ),
+                      tooltip: 'Photo',
+                      onPressed: () {},
+                    ),
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceLow,
+                          borderRadius: BorderRadius.circular(9999),
                         ),
-                        onSubmitted: (_) => _sendMessage(),
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _textController,
+                                textCapitalization: TextCapitalization.sentences,
+                                maxLines: 4,
+                                minLines: 1,
+                                style: AppTextStyles.bodyMedium,
+                                decoration: const InputDecoration(
+                                  hintText: 'Type a message...',
+                                  hintStyle: TextStyle(
+                                    color: AppColors.textTertiary,
+                                    fontSize: 14,
+                                  ),
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.symmetric(
+                                    vertical: 10,
+                                  ),
+                                ),
+                                onSubmitted: (_) => _sendMessage(),
+                              ),
+                            ),
+                            const Icon(
+                              Icons.mood_rounded,
+                              size: 20,
+                              color: AppColors.textTertiary,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(width: AppSpacing.xs),
-                    IconButton(
-                      onPressed: _isSending ? null : _sendMessage,
-                      icon: _isSending
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  AppColors.primaryPurple,
+                    const SizedBox(width: AppSpacing.sm),
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: const BoxDecoration(
+                        color: AppColors.primaryPurple,
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        onPressed: _isSending ? null : _sendMessage,
+                        icon: _isSending
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
                                 ),
+                              )
+                            : const Icon(
+                                Icons.send_rounded,
+                                color: Colors.white,
+                                size: 19,
                               ),
-                            )
-                          : const Icon(
-                              Icons.send_rounded,
-                              color: AppColors.primaryPurple,
-                              size: 22,
-                            ),
+                      ),
                     ),
                   ],
                 ),
@@ -507,43 +669,425 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 }
 
-class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message, required this.isMe});
+class _ContextualRequestBanner extends StatelessWidget {
+  const _ContextualRequestBanner({
+    required this.needId,
+    required this.otherUserName,
+  });
 
-  final MessageModel message;
-  final bool isMe;
+  final String needId;
+  final String otherUserName;
 
   @override
   Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.screenHorizontal,
+        vertical: 8,
+      ),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderSubtle),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x06000000),
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.primaryPurple,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Flexible(
+                      child: Text(
+                        'CONTEXTUAL REQUEST',
+                        style: TextStyle(
+                          color: AppColors.primaryPurple,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceLow,
+                        borderRadius: BorderRadius.circular(9999),
+                      ),
+                      child: const Text(
+                        'In Progress',
+                        style: TextStyle(
+                          color: AppColors.primaryPurple,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  needId.isNotEmpty
+                      ? 'React Development for Project'
+                      : 'Peer Collaboration with $otherUserName',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13.5,
+                    color: AppColors.textPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'Due in 4 days • Front-end API & Polish',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textTertiary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    SizedBox(width: 4),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Details',
+                          style: TextStyle(
+                            color: AppColors.primaryPurple,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_outward_rounded,
+                          size: 12,
+                          color: AppColors.primaryPurple,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SystemMatchCard extends StatelessWidget {
+  const _SystemMatchCard({required this.otherUserName});
+
+  final String otherUserName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
+      child: Column(
+        children: [
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.auto_awesome_rounded,
+                size: 16,
+                color: AppColors.primaryPurple,
+              ),
+              SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  '94% Compatibility Match',
+                  style: TextStyle(
+                    color: AppColors.primaryPurple,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12.5,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'You connected with $otherUserName via NIVA Need Match. Keep interactions safe, friendly, and aligned with community trust.',
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 11.5,
+              height: 1.4,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickRepliesCarousel extends StatelessWidget {
+  const _QuickRepliesCarousel({required this.onSelectReply});
+
+  final ValueChanged<String> onSelectReply;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 38,
+      margin: const EdgeInsets.only(bottom: 6),
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.screenHorizontal,
+        ),
+        children: [
+          _ReplyChip(
+            icon: Icons.code_rounded,
+            label: 'Send Repo Link',
+            onTap: () => onSelectReply('Here is the GitHub repo: '),
+          ),
+          const SizedBox(width: 8),
+          _ReplyChip(
+            icon: Icons.calendar_today_rounded,
+            label: 'Schedule Call',
+            onTap: () => onSelectReply('Can we schedule a quick call today?'),
+          ),
+          const SizedBox(width: 8),
+          _ReplyChip(
+            icon: Icons.attachment_rounded,
+            label: 'Share Details',
+            onTap: () => onSelectReply('Here are the project requirements: '),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReplyChip extends StatelessWidget {
+  const _ReplyChip({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceLow,
+          borderRadius: BorderRadius.circular(9999),
+          border: Border.all(color: AppColors.borderSubtle),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: AppColors.primaryPurple),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.primaryPurple,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MessageBubble extends StatelessWidget {
+  const _MessageBubble({
+    required this.message,
+    required this.isMe,
+    this.otherUserName = '',
+  });
+
+  final MessageModel message;
+  final bool isMe;
+  final String otherUserName;
+
+  @override
+  Widget build(BuildContext context) {
+    if (isMe) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.78,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                decoration: const BoxDecoration(
+                  color: AppColors.primaryPurple,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(18),
+                    topRight: Radius.circular(18),
+                    bottomLeft: Radius.circular(18),
+                    bottomRight: Radius.circular(4),
+                  ),
+                ),
+                child: Text(
+                  message.text,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 2),
+              const Padding(
+                padding: EdgeInsets.only(right: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '10:16 AM',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
+                    SizedBox(width: 3),
+                    Icon(
+                      Icons.done_all_rounded,
+                      size: 13,
+                      color: AppColors.primaryPurple,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+      alignment: Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 4),
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
+          maxWidth: MediaQuery.of(context).size.width * 0.82,
         ),
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: 10,
-        ),
-        decoration: BoxDecoration(
-          color: isMe ? AppColors.primaryPurple : AppColors.card,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(AppSpacing.radiusLg),
-            topRight: const Radius.circular(AppSpacing.radiusLg),
-            bottomLeft: Radius.circular(isMe ? AppSpacing.radiusLg : 4),
-            bottomRight: Radius.circular(isMe ? 4 : AppSpacing.radiusLg),
-          ),
-          border: isMe
-              ? null
-              : Border.all(color: AppColors.borderSubtle, width: 1),
-        ),
-        child: Text(
-          message.text,
-          style: AppTextStyles.bodyMedium.copyWith(
-            color: isMe ? AppColors.textOnPrimary : AppColors.textPrimary,
-            fontSize: 14.5,
-          ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: NivaAvatar(
+                name: otherUserName.isNotEmpty ? otherUserName : 'User',
+                size: 26,
+                backgroundColor: AppColors.servicesBg,
+                textColor: AppColors.primaryPurple,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(18),
+                        topRight: Radius.circular(18),
+                        bottomLeft: Radius.circular(4),
+                        bottomRight: Radius.circular(18),
+                      ),
+                      border: Border.all(color: AppColors.borderSubtle),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x06000000),
+                          blurRadius: 4,
+                          offset: Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      message.text,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  const Padding(
+                    padding: EdgeInsets.only(left: 4),
+                    child: Text(
+                      '10:14 AM',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

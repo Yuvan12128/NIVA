@@ -76,6 +76,15 @@ abstract final class AppTextStyles {
     height: 1.45,
   );
 
+  static const TextStyle bodyBold = TextStyle(
+    fontFamily: fontFamily,
+    fontFamilyFallback: fontFallbacks,
+    fontSize: 14,
+    fontWeight: FontWeight.w600,
+    color: AppColors.textPrimary,
+    height: 1.45,
+  );
+
   // Caption
   static const TextStyle caption = TextStyle(
     fontFamily: fontFamily,

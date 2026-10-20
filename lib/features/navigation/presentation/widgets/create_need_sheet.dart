@@ -337,7 +337,7 @@ class _CreateNeedSheetState extends State<CreateNeedSheet> {
           'Choose your discovery intent to get started',
           style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
         ),
-        const SizedBox(height: AppSpacing.xl),
+        const SizedBox(height: AppSpacing.lg),
 
         // Option 1: I Need
         _IntentOptionTile(
@@ -414,6 +414,88 @@ class _CreateNeedSheetState extends State<CreateNeedSheet> {
         ),
         const SizedBox(height: AppSpacing.sm),
 
+        // Top Switcher in Form
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceLow,
+            borderRadius: BorderRadius.circular(9999),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 9),
+                  decoration: BoxDecoration(
+                    color: AppColors.card,
+                    borderRadius: BorderRadius.circular(9999),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x0C000000),
+                        blurRadius: 4,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.handshake_outlined,
+                        size: 16,
+                        color: AppColors.primaryPurple,
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        'I Need',
+                        style: TextStyle(
+                          color: AppColors.primaryPurple,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _currentStep = _SheetStep.helpForm;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 9),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.volunteer_activism_rounded,
+                          size: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'I Can Help',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+
         const Text('What do you need?', style: AppTextStyles.h2),
         const SizedBox(height: AppSpacing.xs),
         Text(
@@ -422,23 +504,97 @@ class _CreateNeedSheetState extends State<CreateNeedSheet> {
         ),
         const SizedBox(height: AppSpacing.lg),
 
-        // Primary Natural Language Input
-        const Text(
-          'What are you looking for?',
-          style: AppTextStyles.bodyMedium,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        TextField(
-          controller: _needController,
-          autofocus: true,
-          maxLines: 3,
-          minLines: 2,
-          textInputAction: TextInputAction.done,
-          style: AppTextStyles.body,
-          decoration: const InputDecoration(
-            hintText: 'e.g., I need a Java tutor for data structures, or Looking for a photographer...',
+        // Primary Natural Language Input Card
+        Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceLow,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.borderSubtle),
           ),
-          onChanged: (_) => setState(() {}),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: AppColors.primaryPurple,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'What are you looking for?',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryFixed,
+                      borderRadius: BorderRadius.circular(9999),
+                    ),
+                    child: const Text(
+                      'Required',
+                      style: TextStyle(
+                        color: AppColors.primaryPurple,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              TextField(
+                controller: _needController,
+                autofocus: true,
+                maxLines: 3,
+                minLines: 2,
+                textInputAction: TextInputAction.done,
+                style: AppTextStyles.body,
+                decoration: InputDecoration(
+                  hintText:
+                      'e.g., I need a Java tutor for data structures, or Looking for a photographer...',
+                  prefixIcon: const Icon(
+                    Icons.lightbulb_outline_rounded,
+                    color: AppColors.primaryPurple,
+                    size: 20,
+                  ),
+                  filled: true,
+                  fillColor: AppColors.card,
+                  contentPadding: const EdgeInsets.all(12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Keep it concise so local peers notice right away.',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: AppSpacing.md),
 
@@ -676,6 +832,88 @@ class _CreateNeedSheetState extends State<CreateNeedSheet> {
         ),
         const SizedBox(height: AppSpacing.sm),
 
+        // Top Switcher in Form
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceLow,
+            borderRadius: BorderRadius.circular(9999),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _currentStep = _SheetStep.needForm;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 9),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.handshake_outlined,
+                          size: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'I Need',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 9),
+                  decoration: BoxDecoration(
+                    color: AppColors.card,
+                    borderRadius: BorderRadius.circular(9999),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x0C000000),
+                        blurRadius: 4,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.volunteer_activism_rounded,
+                        size: 16,
+                        color: Color(0xFF059669),
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        'I Can Help',
+                        style: TextStyle(
+                          color: Color(0xFF047857),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+
         const Text('What can you help with?', style: AppTextStyles.h2),
         const SizedBox(height: AppSpacing.xs),
         Text(
@@ -684,21 +922,97 @@ class _CreateNeedSheetState extends State<CreateNeedSheet> {
         ),
         const SizedBox(height: AppSpacing.lg),
 
-        // Primary Natural Language Offer Input
-        const Text('What can you offer?', style: AppTextStyles.bodyMedium),
-        const SizedBox(height: AppSpacing.sm),
-        TextField(
-          controller: _helpController,
-          autofocus: true,
-          maxLines: 3,
-          minLines: 2,
-          textInputAction: TextInputAction.done,
-          style: AppTextStyles.body,
-          decoration: const InputDecoration(
-            hintText:
-                'e.g., I can teach Java, help with React, or repair laptops...',
+        // Primary Natural Language Offer Input Card
+        Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceLow,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.borderSubtle),
           ),
-          onChanged: (_) => setState(() {}),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF059669),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'What can you offer?',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECFDF5),
+                      borderRadius: BorderRadius.circular(9999),
+                    ),
+                    child: const Text(
+                      'Required',
+                      style: TextStyle(
+                        color: Color(0xFF047857),
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              TextField(
+                controller: _helpController,
+                autofocus: true,
+                maxLines: 3,
+                minLines: 2,
+                textInputAction: TextInputAction.done,
+                style: AppTextStyles.body,
+                decoration: InputDecoration(
+                  hintText:
+                      'e.g., I can teach Java, help with React, or repair laptops...',
+                  prefixIcon: const Icon(
+                    Icons.volunteer_activism_outlined,
+                    color: Color(0xFF059669),
+                    size: 20,
+                  ),
+                  filled: true,
+                  fillColor: AppColors.card,
+                  contentPadding: const EdgeInsets.all(12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Add key details so local peers can easily discover your skills.',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: AppSpacing.md),
 

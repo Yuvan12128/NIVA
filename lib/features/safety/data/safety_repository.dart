@@ -30,6 +30,19 @@ class SafetyRepository {
   static String generateBlockDocId(String blockerId, String blockedUserId) =>
       '${blockerId.trim()}_${blockedUserId.trim()}';
 
+  /// Canonical document ID for a report to idempotently prevent duplicate reports
+  /// without requiring an unauthorized read query on the reports collection.
+  static String generateReportDocId(
+    String reporterId,
+    String reportedUserId, [
+    String? referenceId,
+  ]) {
+    final ref = (referenceId != null && referenceId.trim().isNotEmpty)
+        ? referenceId.trim()
+        : 'general';
+    return '${reporterId.trim()}_${reportedUserId.trim()}_$ref';
+  }
+
   /// In-memory session cache of blocked user IDs by blocker UID.
   static final Map<String, Set<String>> _sessionBlockedCache = {};
 
@@ -223,25 +236,14 @@ class SafetyRepository {
       throw ArgumentError('Report description must be 500 characters or less.');
     }
 
+    final docId = generateReportDocId(repId, targetId, referenceId);
+
     try {
       final col = _reportsCollection;
       if (col != null) {
-        // 2. Prevent obvious duplicate reports for the same target
-        final existingQuery = col
-            .where('reporterId', isEqualTo: repId)
-            .where('reportedUserId', isEqualTo: targetId)
-            .limit(1);
-
-        final existing = await existingQuery.get();
-        if (existing.docs.isNotEmpty) {
-          debugPrint('SafetyRepository: duplicate report detected.');
-          return existing.docs.first.id;
-        }
-
-        // 3. Write report
-        final docRef = col.doc();
+        final docRef = col.doc(docId);
         final report = ReportModel(
-          id: docRef.id,
+          id: docId,
           reporterId: repId,
           reportedUserId: targetId,
           reason: cleanReason,
@@ -251,12 +253,12 @@ class SafetyRepository {
         );
 
         await docRef.set(report.toMap(useServerTimestamp: true));
-        return docRef.id;
+        return docId;
       }
-      return 'rep_${DateTime.now().millisecondsSinceEpoch}';
+      return docId;
     } catch (e) {
       debugPrint('SafetyRepository.reportUser notice: $e');
-      return 'rep_${DateTime.now().millisecondsSinceEpoch}';
+      return docId;
     }
   }
 }
