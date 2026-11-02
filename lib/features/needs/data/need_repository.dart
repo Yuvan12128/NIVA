@@ -4,14 +4,24 @@ import 'package:flutter/foundation.dart';
 import 'need_model.dart';
 
 /// Lightweight Firestore repository handling needs & capabilities (`needs` collection).
+/// Robustly handles Firebase initialization states and supports categorized queries.
 class NeedRepository {
   NeedRepository({FirebaseFirestore? firestore})
-    : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _customFirestore = firestore;
 
-  final FirebaseFirestore _firestore;
+  final FirebaseFirestore? _customFirestore;
 
-  CollectionReference<Map<String, dynamic>> get _needsCollection =>
-      _firestore.collection('needs');
+  FirebaseFirestore? get _firestore {
+    if (_customFirestore != null) return _customFirestore;
+    try {
+      return FirebaseFirestore.instance;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  CollectionReference<Map<String, dynamic>>? get _needsCollection =>
+      _firestore?.collection('needs');
 
   // In-memory cache to conserve Firestore read quota on the free tier
   static List<NeedModel>? _cachedRecentNeeds;
@@ -27,10 +37,16 @@ class NeedRepository {
   /// Publish a new need or help offer to Firestore.
   /// Uses server-side timestamps for consistency.
   Future<String> createNeed(NeedModel need) async {
+    final col = _needsCollection;
+    if (col == null) {
+      throw FirebaseException(
+        plugin: 'cloud_firestore',
+        message: 'No Firebase App is available',
+      );
+    }
     try {
-      final docRef = need.needId.isNotEmpty
-          ? _needsCollection.doc(need.needId)
-          : _needsCollection.doc();
+      final docRef =
+          need.needId.isNotEmpty ? col.doc(need.needId) : col.doc();
 
       final data = need.toMap(useServerTimestamp: true);
       await docRef.set(data);
@@ -44,10 +60,18 @@ class NeedRepository {
 
   /// Update targeted fields of an existing need.
   Future<void> updateNeed(String needId, Map<String, dynamic> data) async {
+    final col = _needsCollection;
+    if (col == null) {
+      throw FirebaseException(
+        plugin: 'cloud_firestore',
+        message: 'No Firebase App is available',
+      );
+    }
     try {
       final updateData = Map<String, dynamic>.from(data);
       updateData['updatedAt'] = FieldValue.serverTimestamp();
-      await _needsCollection.doc(needId).update(updateData);
+      await col.doc(needId).update(updateData);
+      clearRecentNeedsCache();
     } catch (e) {
       debugPrint('NeedRepository.updateNeed error: $e');
       rethrow;
@@ -56,11 +80,70 @@ class NeedRepository {
 
   /// Delete a need document.
   Future<void> deleteNeed(String needId) async {
+    final col = _needsCollection;
+    if (col == null) {
+      throw FirebaseException(
+        plugin: 'cloud_firestore',
+        message: 'No Firebase App is available',
+      );
+    }
     try {
-      await _needsCollection.doc(needId).delete();
+      await col.doc(needId).delete();
+      clearRecentNeedsCache();
     } catch (e) {
       debugPrint('NeedRepository.deleteNeed error: $e');
       rethrow;
+    }
+  }
+
+  /// Real-time stream of needs filtered strictly by type ('need' or 'help').
+  Stream<List<NeedModel>> streamNeedsByType(String type, {int limit = 30}) {
+    final col = _needsCollection;
+    if (col == null) return Stream.value(const <NeedModel>[]);
+
+    return col
+        .where('type', isEqualTo: type)
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snapshot) =>
+              snapshot.docs
+                  .map((doc) => NeedModel.fromMap(doc.id, doc.data()))
+                  .toList(growable: false),
+        )
+        .handleError((dynamic error) {
+          debugPrint('NeedRepository.streamNeedsByType error: $error');
+          return const <NeedModel>[];
+        });
+  }
+
+  /// One-shot fetch of needs filtered strictly by type ('need' or 'help').
+  Future<List<NeedModel>> getNeedsByType(
+    String type, {
+    int limit = 20,
+    DocumentSnapshot? startAfter,
+  }) async {
+    final col = _needsCollection;
+    if (col == null) return const [];
+
+    try {
+      Query<Map<String, dynamic>> query = col
+          .where('type', isEqualTo: type)
+          .orderBy('createdAt', descending: true)
+          .limit(limit);
+
+      if (startAfter != null) {
+        query = query.startAfterDocument(startAfter);
+      }
+
+      final snapshot = await query.get();
+      return snapshot.docs
+          .map((doc) => NeedModel.fromMap(doc.id, doc.data()))
+          .toList(growable: false);
+    } catch (e) {
+      debugPrint('NeedRepository.getNeedsByType error: $e');
+      return const [];
     }
   }
 
@@ -70,8 +153,11 @@ class NeedRepository {
     int limit = 20,
     DocumentSnapshot? startAfter,
   }) async {
+    final col = _needsCollection;
+    if (col == null) return const [];
+
     try {
-      Query<Map<String, dynamic>> query = _needsCollection
+      Query<Map<String, dynamic>> query = col
           .where('userId', isEqualTo: userId)
           .orderBy('createdAt', descending: true)
           .limit(limit);
@@ -92,14 +178,18 @@ class NeedRepository {
 
   /// Real-time stream of recent needs with a strict query limit.
   Stream<List<NeedModel>> streamRecentNeeds({int limit = 10}) {
-    return _needsCollection
+    final col = _needsCollection;
+    if (col == null) return Stream.value(const <NeedModel>[]);
+
+    return col
         .orderBy('createdAt', descending: true)
         .limit(limit)
         .snapshots()
         .map(
-          (snapshot) => snapshot.docs
-              .map((doc) => NeedModel.fromMap(doc.id, doc.data()))
-              .toList(growable: false),
+          (snapshot) =>
+              snapshot.docs
+                  .map((doc) => NeedModel.fromMap(doc.id, doc.data()))
+                  .toList(growable: false),
         )
         .handleError((dynamic error) {
           debugPrint('NeedRepository.streamRecentNeeds error: $error');
@@ -122,8 +212,11 @@ class NeedRepository {
       return _cachedRecentNeeds!;
     }
 
+    final col = _needsCollection;
+    if (col == null) return const [];
+
     try {
-      Query<Map<String, dynamic>> query = _needsCollection
+      Query<Map<String, dynamic>> query = col
           .orderBy('createdAt', descending: true)
           .limit(limit);
 
@@ -132,9 +225,10 @@ class NeedRepository {
       }
 
       final snapshot = await query.get();
-      final results = snapshot.docs
-          .map((doc) => NeedModel.fromMap(doc.id, doc.data()))
-          .toList(growable: false);
+      final results =
+          snapshot.docs
+              .map((doc) => NeedModel.fromMap(doc.id, doc.data()))
+              .toList(growable: false);
 
       if (startAfter == null) {
         _cachedRecentNeeds = results;
@@ -154,8 +248,11 @@ class NeedRepository {
     int limit = 20,
     DocumentSnapshot? startAfter,
   }) async {
+    final col = _needsCollection;
+    if (col == null) return const [];
+
     try {
-      Query<Map<String, dynamic>> query = _needsCollection
+      Query<Map<String, dynamic>> query = col
           .where('category', isEqualTo: category)
           .orderBy('createdAt', descending: true)
           .limit(limit);
@@ -181,8 +278,11 @@ class NeedRepository {
     int limit = 20,
     DocumentSnapshot? startAfter,
   }) async {
+    final col = _needsCollection;
+    if (col == null) return const [];
+
     try {
-      Query<Map<String, dynamic>> query = _needsCollection;
+      Query<Map<String, dynamic>> query = col;
 
       if (category != null && category.isNotEmpty) {
         query = query.where('category', isEqualTo: category);

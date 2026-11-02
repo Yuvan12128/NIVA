@@ -10,9 +10,11 @@ import '../../../core/widgets/niva_button.dart';
 import '../../../core/widgets/niva_search_bar.dart';
 import '../../auth/data/auth_service.dart';
 import '../../connect/data/connection_request_repository.dart';
+import '../../discover/presentation/discover_people_screen.dart';
 import '../../matching/presentation/widgets/matching_sheet.dart';
 import '../../needs/data/need_repository.dart';
 import '../../safety/data/safety_repository.dart';
+import '../../user/data/user_repository.dart';
 import '../data/discovery_model.dart';
 import '../data/search_filter_model.dart';
 import '../data/search_service.dart';
@@ -29,12 +31,16 @@ class ExploreScreen extends StatefulWidget {
     this.searchService,
     this.connectionRequestRepository,
     this.safetyRepository,
+    this.userRepository,
+    this.initialMode = 'all',
   });
 
   final NeedRepository? needRepository;
   final SearchService? searchService;
   final ConnectionRequestRepository? connectionRequestRepository;
   final SafetyRepository? safetyRepository;
+  final UserRepository? userRepository;
+  final String initialMode;
 
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
@@ -44,6 +50,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounceTimer;
 
+  late String _activeMode = widget.initialMode;
   String _searchQuery = '';
   SearchFilter _searchFilter = SearchFilter.empty;
   bool _isLoading = false;
@@ -310,8 +317,190 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
   }
 
+  Widget _buildHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Explore', style: AppTextStyles.h1),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'Discover people, knowledge, opportunities and more.',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.textSecondary,
+                  fontSize: 15,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 10,
+            vertical: 5,
+          ),
+          decoration: BoxDecoration(
+            color: AppColors.primaryFixed,
+            borderRadius: AppSpacing.borderRadiusFull,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.location_on_rounded,
+                size: 14,
+                color: AppColors.primaryPurple,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'Bengaluru, IN',
+                style: AppTextStyles.captionSmall.copyWith(
+                  color: AppColors.primaryPurple,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildModeSwitcher() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.appleSecondaryBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.appleBorder, width: 0.8),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildModeTab(
+              mode: 'all',
+              title: 'All Discoveries',
+              icon: Icons.explore_outlined,
+            ),
+          ),
+          Expanded(
+            child: _buildModeTab(
+              mode: 'people',
+              title: 'Discover People',
+              icon: Icons.people_outline_rounded,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeTab({
+    required String mode,
+    required String title,
+    required IconData icon,
+  }) {
+    final isSelected = _activeMode == mode;
+
+    return GestureDetector(
+      onTap: () {
+        if (_activeMode != mode) {
+          setState(() {
+            _activeMode = mode;
+          });
+        }
+      },
+      child: Container(
+        height: 38,
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow:
+              isSelected
+                  ? const [
+                    BoxShadow(
+                      color: Color(0x14000000),
+                      blurRadius: 4,
+                      offset: Offset(0, 1),
+                    ),
+                  ]
+                  : null,
+        ),
+        alignment: Alignment.center,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? AppColors.appleBlue : AppColors.textTertiary,
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                  color:
+                      isSelected
+                          ? AppColors.appleBlue
+                          : AppColors.textSecondary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_activeMode == 'people') {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.screenHorizontal,
+                  vertical: AppSpacing.md,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(),
+                    const SizedBox(height: AppSpacing.md),
+                    _buildModeSwitcher(),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: DiscoverPeopleScreen(
+                  showAppBar: false,
+                  userRepository: widget.userRepository,
+                  safetyRepository: _safetyRepo,
+                  connectionRequestRepository: _connectionRepo,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final isFiltering =
         _searchQuery.trim().isNotEmpty || _searchFilter.hasActiveFilters;
 
@@ -332,59 +521,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. Header with Location Badge
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Explore', style: AppTextStyles.h1),
-                          const SizedBox(height: AppSpacing.xs),
-                          Text(
-                            'Discover people, knowledge, opportunities and more.',
-                            style: AppTextStyles.caption.copyWith(
-                              color: AppColors.textSecondary,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryFixed,
-                        borderRadius: AppSpacing.borderRadiusFull,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.location_on_rounded,
-                            size: 14,
-                            color: AppColors.primaryPurple,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Bengaluru, IN',
-                            style: AppTextStyles.captionSmall.copyWith(
-                              color: AppColors.primaryPurple,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.lg),
+                _buildHeader(),
+                const SizedBox(height: AppSpacing.md),
+                _buildModeSwitcher(),
+                const SizedBox(height: AppSpacing.md),
 
                 // 2. Search & Filter Bar
                 NivaSearchBar(

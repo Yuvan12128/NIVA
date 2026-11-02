@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "152596573565-4nem4qnnldlcup8frk2mqnc064abuhbu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.niva",
+            "certificate_hash": "4f94233a9b4e28f5dd8d3694fae9f8afaa222953"
+          }
+        },
+        {
           "client_id": "152596573565-vrqvo8io33g55h3b1pnsivkir4pnropm.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -42,6 +50,14 @@
         }
       },
       "oauth_client": [
+        {
+          "client_id": "152596573565-15qstueuagr6kp8ma1vk203a3s6do8bn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.niva.app",
+            "certificate_hash": "4f94233a9b4e28f5dd8d3694fae9f8afaa222953"
+          }
+        },
         {
           "client_id": "152596573565-vrqvo8io33g55h3b1pnsivkir4pnropm.apps.googleusercontent.com",
           "client_type": 3

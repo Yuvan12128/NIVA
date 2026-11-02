@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niva/app/niva_app.dart';
+import 'package:niva/features/auth/presentation/login_screen.dart';
+import 'package:niva/features/auth/presentation/sign_in_screen.dart';
+import 'package:niva/features/auth/presentation/signup_screen.dart';
 import 'package:niva/features/chat/data/chat_model.dart';
 import 'package:niva/features/chat/data/chat_repository.dart';
 import 'package:niva/features/chat/data/message_model.dart';
@@ -64,24 +67,27 @@ void main() {
   });
 
   group('Authentication Flow Widget Tests', () {
-    testWidgets('Unauthenticated user is presented with LoginScreen', (
+    testWidgets('Unauthenticated user is presented with minimal Apple-style SignInScreen', (
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(NivaApp(authStateStream: Stream.value(null)));
       await tester.pumpAndSettle();
 
-      // Verify login UI
-      expect(find.text('Sign in to your account'), findsOneWidget);
-      expect(find.text('Email Address'), findsOneWidget);
-      expect(find.text('Password'), findsOneWidget);
-      expect(find.text('Sign In'), findsOneWidget);
-      expect(find.text('Create Account'), findsOneWidget);
+      // Verify minimal Apple-style Google sign-in UI
+      expect(find.byType(SignInScreen), findsOneWidget);
+      expect(find.text('NIVA'), findsOneWidget);
+      expect(find.text('Continue with Google'), findsOneWidget);
+      expect(find.textContaining('Terms and Privacy Policy'), findsOneWidget);
     });
 
     testWidgets('Login validation displays error when fields are empty', (
       WidgetTester tester,
     ) async {
-      await tester.pumpWidget(NivaApp(authStateStream: Stream.value(null)));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: LoginScreen(onNavigateToSignUp: () {}),
+        ),
+      );
       await tester.pumpAndSettle();
 
       // Tap Sign In with empty fields
@@ -98,7 +104,23 @@ void main() {
     testWidgets('Navigation switches between Login and SignUp screens', (
       WidgetTester tester,
     ) async {
-      await tester.pumpWidget(NivaApp(authStateStream: Stream.value(null)));
+      bool isLogin = true;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StatefulBuilder(
+            builder: (context, setState) {
+              return isLogin
+                  ? LoginScreen(
+                      onNavigateToSignUp: () => setState(() => isLogin = false),
+                    )
+                  : SignUpScreen(
+                      onNavigateToLogin: ([_]) =>
+                          setState(() => isLogin = true),
+                    );
+            },
+          ),
+        ),
+      );
       await tester.pumpAndSettle();
 
       // Tap Create Account

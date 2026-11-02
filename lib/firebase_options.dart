@@ -23,10 +23,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for ios - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return ios;
       case TargetPlatform.macOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for macos - '
@@ -64,5 +61,14 @@ class DefaultFirebaseOptions {
     messagingSenderId: '152596573565',
     projectId: 'niva-discovery-1792429167',
     storageBucket: 'niva-discovery-1792429167.firebasestorage.app',
+  );
+
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyCTL0lB5B1cWV682IKbXUx459EP-lVYiYU',
+    appId: '1:152596573565:ios:796737e1e63cd1bf06f014',
+    messagingSenderId: '152596573565',
+    projectId: 'niva-discovery-1792429167',
+    storageBucket: 'niva-discovery-1792429167.firebasestorage.app',
+    iosBundleId: 'com.example.niva',
   );
 }

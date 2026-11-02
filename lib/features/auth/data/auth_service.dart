@@ -1,11 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../user/data/user_model.dart';
 import '../../user/data/user_repository.dart';
 
-/// Central authentication service for NIVA using Firebase Authentication & Firestore.
+/// Central authentication service for NIVA using Firebase Authentication & Google Sign-In.
 class AuthService {
-  AuthService({this.auth, this.userRepository});
+  AuthService({this.auth, this.userRepository, this.googleSignIn});
 
   static AuthService? _instance;
   static AuthService get instance => _instance ??= AuthService();
@@ -13,9 +15,11 @@ class AuthService {
 
   final FirebaseAuth? auth;
   final UserRepository? userRepository;
+  final GoogleSignIn? googleSignIn;
 
   FirebaseAuth get firebaseAuth => auth ?? FirebaseAuth.instance;
   UserRepository get userRepo => userRepository ?? UserRepository();
+  GoogleSignIn get googleSignInInstance => googleSignIn ?? GoogleSignIn();
 
   /// Stream of authentication state changes.
   Stream<User?> get authStateChanges => firebaseAuth.authStateChanges();
@@ -26,6 +30,100 @@ class AuthService {
       return firebaseAuth.currentUser;
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Sign in using Google Sign-In and authenticate with Firebase.
+  /// Automatically retrieves Google name, email, and photoURL,
+  /// then creates or updates users/{uid} in Firestore while preserving existing data.
+  Future<UserCredential?> signInWithGoogle() async {
+    try {
+      final GoogleSignInAccount? googleUser =
+          await googleSignInInstance.signIn();
+      if (googleUser == null) {
+        // User cancelled Google sign-in prompt
+        return null;
+      }
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+      final OAuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential =
+          await firebaseAuth.signInWithCredential(credential);
+      final user = userCredential.user;
+
+      if (user != null) {
+        await syncGoogleUserProfile(user);
+      }
+
+      return userCredential;
+    } catch (e) {
+      debugPrint('AuthService.signInWithGoogle error: $e');
+      rethrow;
+    }
+  }
+
+  /// Synchronize Google profile information into Firestore (users/{uid}).
+  /// - New user: Creates users/{uid} with name, email, and profile photo.
+  /// - Returning user: Preserves all existing data (skills, bio, location, etc.)
+  ///   and only backfills missing fields.
+  Future<void> syncGoogleUserProfile(User user) async {
+    try {
+      final existing = await userRepo.getUserProfile(user.uid);
+      final googleName = user.displayName?.trim().isNotEmpty == true
+          ? user.displayName!.trim()
+          : (user.email?.split('@').first ?? 'Member');
+      final googleEmail = user.email?.trim() ?? '';
+      final googlePhoto = user.photoURL;
+
+      if (existing == null) {
+        final profile = UserModel(
+          uid: user.uid,
+          name: googleName,
+          email: googleEmail,
+          photoUrl: googlePhoto,
+          country: 'India',
+          state: 'Tamil Nadu',
+          city: 'Chennai',
+          language: 'English',
+          role: 'member',
+          skills: const [],
+          canHelpWith: const [],
+          lookingFor: const [],
+          availability: 'Available',
+          trustScore: 100,
+        );
+        await userRepo.createUserProfile(profile);
+      } else {
+        // Preserve existing user data during login!
+        final updates = <String, dynamic>{};
+        if (existing.name.trim().isEmpty && googleName.isNotEmpty) {
+          updates['name'] = googleName;
+        }
+        if ((existing.photoUrl == null || existing.photoUrl!.trim().isEmpty) &&
+            googlePhoto != null &&
+            googlePhoto.isNotEmpty) {
+          updates['photoUrl'] = googlePhoto;
+        }
+
+        if (updates.isNotEmpty) {
+          await userRepo.updateUserProfile(user.uid, updates);
+        }
+
+        // Ensure private account document contains email
+        if (googleEmail.isNotEmpty) {
+          final privateEmail = await userRepo.getUserPrivateEmail(user.uid);
+          if (privateEmail == null || privateEmail.isEmpty) {
+            await userRepo.updateUserProfile(user.uid, {'email': googleEmail});
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('AuthService.syncGoogleUserProfile notice: $e');
     }
   }
 
@@ -125,8 +223,13 @@ class AuthService {
     await firebaseAuth.sendPasswordResetEmail(email: email.trim());
   }
 
-  /// Sign out current authenticated user.
+  /// Sign out current authenticated user from Firebase and Google.
   Future<void> signOut() async {
+    try {
+      await googleSignInInstance.signOut();
+    } catch (e) {
+      debugPrint('GoogleSignIn.signOut notice: $e');
+    }
     await firebaseAuth.signOut();
   }
 
@@ -134,10 +237,12 @@ class AuthService {
   static String getErrorMessage(dynamic error) {
     if (error is FirebaseAuthException) {
       switch (error.code) {
+        case 'account-exists-with-different-credential':
+          return 'An account already exists with this email address using another sign-in method.';
         case 'user-not-found':
         case 'wrong-password':
         case 'invalid-credential':
-          return 'Invalid email or password. Please check your credentials.';
+          return 'Invalid sign-in credentials. Please check your account.';
         case 'email-already-in-use':
           return 'An account already exists for this email address.';
         case 'invalid-email':
@@ -153,6 +258,24 @@ class AuthService {
         default:
           return error.message ?? 'Authentication failed. Please try again.';
       }
+    }
+    final errStr = error.toString().toLowerCase();
+    if (errStr.contains('canceled') || errStr.contains('cancelled') || errStr.contains('popup_closed')) {
+      return 'Google sign in was cancelled.';
+    }
+    if (errStr.contains('apiexception: 10') ||
+        errStr.contains(': 10') ||
+        errStr.contains('developer_error')) {
+      return 'Google Sign-In error (Code 10): Android SHA-1 fingerprint is not added to Firebase Console.';
+    }
+    if (errStr.contains('apiexception: 12500') || errStr.contains(': 12500')) {
+      return 'Google Sign-In error (Code 12500): OAuth consent screen or support email is missing in Firebase Console.';
+    }
+    if (errStr.contains('operation-not-allowed')) {
+      return 'This sign-in method is disabled in Firebase Console. Please enable it in Authentication > Sign-in method.';
+    }
+    if (errStr.contains('network')) {
+      return 'Network connection error. Please check your connection.';
     }
     return 'An unexpected error occurred. Please try again.';
   }

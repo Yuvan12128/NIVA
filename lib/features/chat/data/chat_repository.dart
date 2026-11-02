@@ -125,6 +125,36 @@ class ChatRepository {
     }
   }
 
+  /// Real-time stream of chats for the user.
+  Stream<List<ChatModel>> streamUserChats(String userId, {int limit = 30}) {
+    if (userId.isEmpty) return Stream.value(const []);
+    final col = _chatsCollection;
+    if (col == null) return Stream.value(const []);
+
+    try {
+      return col
+          .where('participantIds', arrayContains: userId)
+          .limit(limit)
+          .snapshots()
+          .map((snapshot) {
+            final chats = snapshot.docs
+                .map((doc) => ChatModel.fromMap(doc.id, doc.data()))
+                .toList();
+
+            chats.sort((a, b) {
+              final tA = a.updatedAt ?? a.createdAt ?? DateTime(2000);
+              final tB = b.updatedAt ?? b.createdAt ?? DateTime(2000);
+              return tB.compareTo(tA);
+            });
+
+            return chats;
+          });
+    } catch (e) {
+      debugPrint('ChatRepository.streamUserChats error: $e');
+      return Stream.value(const []);
+    }
+  }
+
   /// Real-time stream of messages ONLY for the active conversation.
   /// Bounded query avoiding composite index requirements by sorting in memory.
   Stream<List<MessageModel>> streamMessages(String chatId, {int limit = 40}) {
@@ -185,6 +215,35 @@ class ChatRepository {
       throw StateError(
         'Cannot send message because this user relationship is blocked.',
       );
+    }
+
+    // Safety check: Messaging is strictly allowed only after request acceptance
+    if (_chatsCollection != null) {
+      try {
+        final chatDoc = await _chatsCollection!.doc(chatId).get();
+        if (chatDoc.exists && chatDoc.data() != null) {
+          final reqId = chatDoc.data()!['connectionRequestId'] as String?;
+          if (reqId != null && reqId.isNotEmpty) {
+            final reqDoc = await _firestore
+                ?.collection('connection_requests')
+                .doc(reqId)
+                .get();
+            if (reqDoc != null && reqDoc.exists && reqDoc.data() != null) {
+              final status = reqDoc.data()!['status'] as String?;
+              if (status != 'accepted') {
+                throw StateError(
+                  'Messaging is allowed only after connection request acceptance.',
+                );
+              }
+            }
+          }
+        }
+      } catch (e) {
+        if (e is StateError) rethrow;
+        debugPrint(
+          'ChatRepository.sendMessage connection request check notice: $e',
+        );
+      }
     }
 
     try {

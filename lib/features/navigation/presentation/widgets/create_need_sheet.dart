@@ -169,6 +169,7 @@ class _CreateNeedSheetState extends State<CreateNeedSheet> {
             : null,
         status: 'active',
         authorName: authorName,
+        authorPhotoUrl: user?.photoURL,
       );
 
       final docId = await _needRepository.createNeed(need);
@@ -243,6 +244,7 @@ class _CreateNeedSheetState extends State<CreateNeedSheet> {
         availability: _selectedHelpAvailability ?? 'Flexible',
         status: 'active',
         authorName: authorName,
+        authorPhotoUrl: user?.photoURL,
       );
 
       await _needRepository.createNeed(need);

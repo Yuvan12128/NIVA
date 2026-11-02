@@ -26,6 +26,8 @@ import 'package:niva/features/reviews/presentation/widgets/review_sheet.dart';
 import 'package:niva/features/safety/presentation/widgets/report_sheet.dart';
 import 'package:niva/features/splash/presentation/logo_reveal_screen.dart';
 
+final _fixedTestTime = DateTime(2026, 1, 15, 10, 30);
+
 class FakeChatRepository extends ChatRepository {
   @override
   Future<List<ChatModel>> getUserChats(String userId, {int limit = 20}) async {
@@ -36,9 +38,9 @@ class FakeChatRepository extends ChatRepository {
         needId: 'need_123',
         connectionRequestId: 'req_123',
         lastMessage: 'Looking forward to collaborating on Flutter architecture!',
-        lastMessageAt: DateTime.now().subtract(const Duration(minutes: 15)),
-        createdAt: DateTime.now().subtract(const Duration(days: 1)),
-        updatedAt: DateTime.now().subtract(const Duration(minutes: 15)),
+        lastMessageAt: _fixedTestTime.subtract(const Duration(minutes: 15)),
+        createdAt: _fixedTestTime.subtract(const Duration(days: 1)),
+        updatedAt: _fixedTestTime.subtract(const Duration(minutes: 15)),
       ),
       ChatModel(
         id: 'chat_userA_userC',
@@ -46,9 +48,9 @@ class FakeChatRepository extends ChatRepository {
         needId: 'need_456',
         connectionRequestId: 'req_456',
         lastMessage: 'I reviewed your repository structure. Looks clean.',
-        lastMessageAt: DateTime.now().subtract(const Duration(hours: 3)),
-        createdAt: DateTime.now().subtract(const Duration(days: 2)),
-        updatedAt: DateTime.now().subtract(const Duration(hours: 3)),
+        lastMessageAt: _fixedTestTime.subtract(const Duration(hours: 3)),
+        createdAt: _fixedTestTime.subtract(const Duration(days: 2)),
+        updatedAt: _fixedTestTime.subtract(const Duration(hours: 3)),
       ),
     ];
   }
@@ -62,7 +64,7 @@ class FakeChatRepository extends ChatRepository {
         senderId: 'userB',
         receiverId: 'userA',
         text: 'Hi! I saw your post regarding Flutter Architecture assistance.',
-        createdAt: DateTime.now().subtract(const Duration(minutes: 25)),
+        createdAt: _fixedTestTime.subtract(const Duration(minutes: 25)),
       ),
       MessageModel(
         id: 'm2',
@@ -70,7 +72,7 @@ class FakeChatRepository extends ChatRepository {
         senderId: 'userA',
         receiverId: 'userB',
         text: 'Hey Karthik! Yes, looking for guidance on scalable offline caching and responsive layouts.',
-        createdAt: DateTime.now().subtract(const Duration(minutes: 20)),
+        createdAt: _fixedTestTime.subtract(const Duration(minutes: 20)),
       ),
       MessageModel(
         id: 'm3',
@@ -78,7 +80,7 @@ class FakeChatRepository extends ChatRepository {
         senderId: 'userB',
         receiverId: 'userA',
         text: 'Looking forward to collaborating on Flutter architecture!',
-        createdAt: DateTime.now().subtract(const Duration(minutes: 15)),
+        createdAt: _fixedTestTime.subtract(const Duration(minutes: 15)),
       ),
     ]);
   }
@@ -97,7 +99,7 @@ class FakeNotificationRepository extends NotificationRepository {
         body: 'Priya Sundaram accepted your connection request.',
         referenceId: 'req_123',
         isRead: false,
-        createdAt: DateTime.now().subtract(const Duration(minutes: 10)),
+        createdAt: _fixedTestTime.subtract(const Duration(minutes: 10)),
       ),
       NotificationModel(
         id: 'n2',
@@ -108,7 +110,7 @@ class FakeNotificationRepository extends NotificationRepository {
         body: 'Karthik Raja sent a connection request for "Java Mentorship".',
         referenceId: 'req_456',
         isRead: false,
-        createdAt: DateTime.now().subtract(const Duration(hours: 2)),
+        createdAt: _fixedTestTime.subtract(const Duration(hours: 2)),
       ),
       NotificationModel(
         id: 'n3',
@@ -119,7 +121,7 @@ class FakeNotificationRepository extends NotificationRepository {
         body: 'Karthik Raja: Looking forward to collaborating!',
         referenceId: 'chat_userA_userB',
         isRead: true,
-        createdAt: DateTime.now().subtract(const Duration(hours: 5)),
+        createdAt: _fixedTestTime.subtract(const Duration(hours: 5)),
       ),
     ]);
   }
@@ -138,7 +140,7 @@ void main() {
     budget: 'Paid',
     urgency: 'high',
     status: 'active',
-    createdAt: DateTime.now(),
+    createdAt: _fixedTestTime,
   );
 
   final sampleChat = ChatModel(
@@ -147,9 +149,9 @@ void main() {
     needId: 'need_123',
     connectionRequestId: 'req_123',
     lastMessage: 'Looking forward to collaborating on Flutter architecture!',
-    lastMessageAt: DateTime.now(),
-    createdAt: DateTime.now(),
-    updatedAt: DateTime.now(),
+    lastMessageAt: _fixedTestTime,
+    createdAt: _fixedTestTime,
+    updatedAt: _fixedTestTime,
   );
 
   void setupDevice(WidgetTester tester) {
@@ -170,8 +172,21 @@ void main() {
   group('Capture NIVA Production Screens at 390x844', () {
     setUpAll(() async {
       TestWidgetsFlutterBinding.ensureInitialized();
-      const fontDir =
-          '/home/yuvan-shankar-raja/develop/flutter/bin/cache/artifacts/material_fonts';
+      final candidates = [
+        Platform.environment['FLUTTER_ROOT'] != null
+            ? '${Platform.environment['FLUTTER_ROOT']}/bin/cache/artifacts/material_fonts'
+            : null,
+        '/home/u1/develop/flutter/bin/cache/artifacts/material_fonts',
+        '/home/yuvan-shankar-raja/develop/flutter/bin/cache/artifacts/material_fonts',
+      ].whereType<String>();
+
+      String fontDir = '';
+      for (final candidate in candidates) {
+        if (Directory(candidate).existsSync()) {
+          fontDir = candidate;
+          break;
+        }
+      }
 
       try {
         final iconBytes =

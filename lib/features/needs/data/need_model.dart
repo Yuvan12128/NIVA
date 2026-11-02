@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Data model representing a need or help capability in NIVA (`needs/{needId}`).
+/// Enhanced in Phase 3 to carry automatic author profile information (photo and profession).
 class NeedModel {
   const NeedModel({
     required this.needId,
@@ -8,7 +9,7 @@ class NeedModel {
     required this.type,
     required this.title,
     required this.description,
-    required this.category,
+    this.category = 'General',
     this.skills = const [],
     this.location = 'Remote',
     this.urgency = 'Flexible',
@@ -16,6 +17,8 @@ class NeedModel {
     this.availability,
     this.status = 'active',
     this.authorName,
+    this.authorPhotoUrl,
+    this.authorProfession,
     this.createdAt,
     this.updatedAt,
   });
@@ -33,6 +36,8 @@ class NeedModel {
   final String? availability;
   final String status;
   final String? authorName;
+  final String? authorPhotoUrl;
+  final String? authorProfession;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -46,13 +51,16 @@ class NeedModel {
       'skills': skills,
       'location': location,
       'urgency': urgency,
-      'budget': budget,
-      'availability': availability,
+      if (budget != null) 'budget': budget,
+      if (availability != null) 'availability': availability,
       'status': status,
       if (authorName != null) 'authorName': authorName,
-      'createdAt': createdAt != null
-          ? Timestamp.fromDate(createdAt!)
-          : (useServerTimestamp ? FieldValue.serverTimestamp() : null),
+      if (authorPhotoUrl != null) 'authorPhotoUrl': authorPhotoUrl,
+      if (authorProfession != null) 'authorProfession': authorProfession,
+      'createdAt':
+          createdAt != null
+              ? Timestamp.fromDate(createdAt!)
+              : (useServerTimestamp ? FieldValue.serverTimestamp() : null),
       'updatedAt': useServerTimestamp ? FieldValue.serverTimestamp() : null,
     };
   }
@@ -82,6 +90,8 @@ class NeedModel {
       availability: map['availability'] as String?,
       status: map['status'] as String? ?? 'active',
       authorName: map['authorName'] as String?,
+      authorPhotoUrl: map['authorPhotoUrl'] as String?,
+      authorProfession: map['authorProfession'] as String?,
       createdAt: parseDate(map['createdAt']),
       updatedAt: parseDate(map['updatedAt']),
     );
@@ -101,6 +111,8 @@ class NeedModel {
     String? availability,
     String? status,
     String? authorName,
+    String? authorPhotoUrl,
+    String? authorProfession,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -118,6 +130,8 @@ class NeedModel {
       availability: availability ?? this.availability,
       status: status ?? this.status,
       authorName: authorName ?? this.authorName,
+      authorPhotoUrl: authorPhotoUrl ?? this.authorPhotoUrl,
+      authorProfession: authorProfession ?? this.authorProfession,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

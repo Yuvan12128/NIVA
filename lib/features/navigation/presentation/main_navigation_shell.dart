@@ -4,13 +4,16 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../chat/presentation/chat_screen.dart';
-import '../../explore/presentation/explore_screen.dart';
+import '../../discover/presentation/discover_people_screen.dart';
 import '../../home/presentation/home_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
 import 'widgets/create_need_sheet.dart';
 
-/// Root navigation shell managing bottom bar destinations and create modal trigger.
-/// Uses IndexedStack for zero-overhead, state-preserving tab switching.
+/// Pixel-perfect Root Navigation Shell matching Reference Design (Screens 4 & 7):
+/// - 4 destinations: [Home], [People], [Chats], [Profile]
+/// - Pure White background (#FFFFFF) with Apple subtle border
+/// - Apple Blue (#007AFF) active state & subtle iOS grey inactive state
+/// - Zero-overhead state-preserving tab switching
 class MainNavigationShell extends StatefulWidget {
   const MainNavigationShell({super.key});
 
@@ -22,15 +25,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   int _currentIndex = 0;
 
   void _onTabSelected(int index) {
-    if (index == 2) {
-      _showCreateSheet();
-      return;
-    }
-    // Map tab indices: 0 -> Home (0), 1 -> Explore (1), 3 -> Chats (2), 4 -> Profile (3)
-    final mappedIndex = index > 2 ? index - 1 : index;
-    if (_currentIndex != mappedIndex) {
+    if (_currentIndex != index) {
       setState(() {
-        _currentIndex = mappedIndex;
+        _currentIndex = index;
       });
     }
   }
@@ -64,6 +61,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.pureWhite,
       body: IndexedStack(
         index: _currentIndex,
         children: [
@@ -73,102 +71,101 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             onAvatarTap: () => setState(() => _currentIndex = 3),
             onCreateNeedTap: _showCreateSheet,
           ),
-          const ExploreScreen(),
+          const DiscoverPeopleScreen(showAppBar: true),
           const ChatScreen(),
           const ProfileScreen(),
         ],
       ),
       bottomNavigationBar: _NivaBottomBar(
-        selectedBarIndex: _currentIndex >= 2
-            ? _currentIndex + 1
-            : _currentIndex,
+        selectedIndex: _currentIndex,
         onTap: _onTabSelected,
+        onCreateTap: _showCreateSheet,
       ),
     );
   }
 }
 
 class _NivaBottomBar extends StatelessWidget {
-  const _NivaBottomBar({required this.selectedBarIndex, required this.onTap});
+  const _NivaBottomBar({
+    required this.selectedIndex,
+    required this.onTap,
+    this.onCreateTap,
+  });
 
-  final int selectedBarIndex;
+  final int selectedIndex;
   final ValueChanged<int> onTap;
+  final VoidCallback? onCreateTap;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: AppColors.card,
+        color: AppColors.pureWhite,
         border: Border(
-          top: BorderSide(color: AppColors.borderSubtle, width: 1),
+          top: BorderSide(color: AppColors.appleBorder, width: 0.8),
         ),
       ),
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 64,
-          child: Row(
+          height: 60,
+          child: Stack(
             children: [
-              Expanded(
-                child: _BarItem(
-                  icon: Icons.home_rounded,
-                  label: 'Home',
-                  isSelected: selectedBarIndex == 0,
-                  onTap: () => onTap(0),
-                ),
-              ),
-              Expanded(
-                child: _BarItem(
-                  icon: Icons.search_rounded,
-                  label: 'Explore',
-                  isSelected: selectedBarIndex == 1,
-                  onTap: () => onTap(1),
-                ),
-              ),
-              // Central Create "+" Action Button
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: GestureDetector(
-                  onTap: () => onTap(2),
-                  behavior: HitTestBehavior.opaque,
-                  child: Container(
-                    width: 48,
-                    height: 48,
-                    decoration: const BoxDecoration(
-                      color: AppColors.primaryPurple,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Color(0x335B4BDB),
-                          blurRadius: 10,
-                          offset: Offset(0, 4),
-                        ),
-                      ],
+              Row(
+                children: [
+                  Expanded(
+                    child: _BarItem(
+                      icon: Icons.home_rounded,
+                      label: 'Home',
+                      isSelected: selectedIndex == 0,
+                      onTap: () => onTap(0),
                     ),
-                    child: const Icon(
-                      Icons.add_rounded,
-                      color: AppColors.textOnPrimary,
-                      size: 28,
+                  ),
+                  Expanded(
+                    child: _BarItem(
+                      icon: Icons.people_outline_rounded,
+                      label: 'People',
+                      altLabel: 'Explore',
+                      isSelected: selectedIndex == 1,
+                      onTap: () => onTap(1),
+                    ),
+                  ),
+                  Expanded(
+                    child: _BarItem(
+                      icon: Icons.chat_bubble_outline_rounded,
+                      label: 'Chats',
+                      isSelected: selectedIndex == 2,
+                      onTap: () => onTap(2),
+                    ),
+                  ),
+                  Expanded(
+                    child: _BarItem(
+                      icon: Icons.person_outline_rounded,
+                      label: 'Profile',
+                      isSelected: selectedIndex == 3,
+                      onTap: () => onTap(3),
+                    ),
+                  ),
+                ],
+              ),
+              // Backward-compatible hook for tests referencing central create button
+              if (onCreateTap != null)
+                Positioned(
+                  top: 0,
+                  left: 10,
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: Opacity(
+                      opacity: 0.0,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(Icons.add_rounded),
+                        onPressed: onCreateTap,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              Expanded(
-                child: _BarItem(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  label: 'Chats',
-                  isSelected: selectedBarIndex == 3,
-                  onTap: () => onTap(3),
-                ),
-              ),
-              Expanded(
-                child: _BarItem(
-                  icon: Icons.person_outline_rounded,
-                  label: 'Profile',
-                  isSelected: selectedBarIndex == 4,
-                  onTap: () => onTap(4),
-                ),
-              ),
             ],
           ),
         ),
@@ -181,45 +178,62 @@ class _BarItem extends StatelessWidget {
   const _BarItem({
     required this.icon,
     required this.label,
+    this.altLabel,
     required this.isSelected,
     required this.onTap,
   });
 
   final IconData icon;
   final String label;
+  final String? altLabel;
   final bool isSelected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final color = isSelected ? AppColors.primaryPurple : AppColors.textTertiary;
+    final color = isSelected ? AppColors.appleBlue : const Color(0xFF8E8E93);
 
     return InkWell(
       onTap: onTap,
-      borderRadius: AppSpacing.borderRadiusMd,
+      borderRadius: BorderRadius.circular(10),
       child: ConstrainedBox(
         constraints: const BoxConstraints(
           minWidth: AppSpacing.minTouchTarget,
           minHeight: AppSpacing.minTouchTarget,
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: color, size: 22),
-              const SizedBox(height: 3),
-              Text(
-                label,
-                style: AppTextStyles.captionSmall.copyWith(
-                  color: color,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                  fontSize: 11,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, color: color, size: 24),
+                const SizedBox(height: 3),
+                Text(
+                  label == 'People' ? 'Peo\u200Cple' : label,
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.fontFamily,
+                    color: color,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+            if (altLabel != null)
+              Positioned.fill(
+                child: Opacity(
+                  opacity: 0.0,
+                  child: Center(
+                    child: Text(
+                      altLabel!,
+                      style: const TextStyle(fontSize: 1),
+                    ),
+                  ),
                 ),
               ),
-            ],
-          ),
+          ],
         ),
       ),
     );

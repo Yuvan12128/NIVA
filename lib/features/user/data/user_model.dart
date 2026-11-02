@@ -14,9 +14,16 @@ class UserModel {
     this.language = 'English',
     this.role = 'member',
     this.bio = '',
+    this.profession = '',
+    this.education = '',
+    this.experience = '',
     this.skills = const [],
     this.canHelpWith = const [],
     this.lookingFor = const [],
+    this.linkedInUrl = '',
+    this.githubUrl = '',
+    this.portfolioUrl = '',
+    this.otherSocialUrl = '',
     this.availability = 'Available',
     this.trustScore = 100,
     this.completedConnections = 0,
@@ -37,9 +44,16 @@ class UserModel {
   final String language;
   final String role;
   final String bio;
+  final String profession;
+  final String education;
+  final String experience;
   final List<String> skills;
   final List<String> canHelpWith;
   final List<String> lookingFor;
+  final String linkedInUrl;
+  final String githubUrl;
+  final String portfolioUrl;
+  final String otherSocialUrl;
   final String availability;
   final int trustScore;
   final int completedConnections;
@@ -66,9 +80,16 @@ class UserModel {
       'language': language,
       'role': role,
       'bio': bio,
+      'profession': profession,
+      'education': education,
+      'experience': experience,
       'skills': skills,
       'canHelpWith': canHelpWith,
       'lookingFor': lookingFor,
+      'linkedInUrl': linkedInUrl,
+      'githubUrl': githubUrl,
+      'portfolioUrl': portfolioUrl,
+      'otherSocialUrl': otherSocialUrl,
       'availability': availability,
       'trustScore': trustScore,
       'completedConnections': completedConnections,
@@ -104,6 +125,9 @@ class UserModel {
       language: map['language'] as String? ?? 'English',
       role: map['role'] as String? ?? 'member',
       bio: map['bio'] as String? ?? '',
+      profession: map['profession'] as String? ?? '',
+      education: map['education'] as String? ?? '',
+      experience: map['experience'] as String? ?? '',
       skills:
           (map['skills'] as List<dynamic>?)
               ?.map((e) => e.toString())
@@ -119,6 +143,10 @@ class UserModel {
               ?.map((e) => e.toString())
               .toList() ??
           const [],
+      linkedInUrl: map['linkedInUrl'] as String? ?? '',
+      githubUrl: map['githubUrl'] as String? ?? '',
+      portfolioUrl: map['portfolioUrl'] as String? ?? '',
+      otherSocialUrl: map['otherSocialUrl'] as String? ?? '',
       availability: map['availability'] as String? ?? 'Available',
       trustScore: (map['trustScore'] as num?)?.toInt() ?? 100,
       completedConnections:
@@ -143,9 +171,16 @@ class UserModel {
     String? language,
     String? role,
     String? bio,
+    String? profession,
+    String? education,
+    String? experience,
     List<String>? skills,
     List<String>? canHelpWith,
     List<String>? lookingFor,
+    String? linkedInUrl,
+    String? githubUrl,
+    String? portfolioUrl,
+    String? otherSocialUrl,
     String? availability,
     int? trustScore,
     int? completedConnections,
@@ -166,9 +201,16 @@ class UserModel {
       language: language ?? this.language,
       role: role ?? this.role,
       bio: bio ?? this.bio,
+      profession: profession ?? this.profession,
+      education: education ?? this.education,
+      experience: experience ?? this.experience,
       skills: skills ?? this.skills,
       canHelpWith: canHelpWith ?? this.canHelpWith,
       lookingFor: lookingFor ?? this.lookingFor,
+      linkedInUrl: linkedInUrl ?? this.linkedInUrl,
+      githubUrl: githubUrl ?? this.githubUrl,
+      portfolioUrl: portfolioUrl ?? this.portfolioUrl,
+      otherSocialUrl: otherSocialUrl ?? this.otherSocialUrl,
       availability: availability ?? this.availability,
       trustScore: trustScore ?? this.trustScore,
       completedConnections: completedConnections ?? this.completedConnections,

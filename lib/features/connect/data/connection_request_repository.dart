@@ -8,7 +8,7 @@ import '../../safety/data/safety_repository.dart';
 import 'connection_request_model.dart';
 
 /// Lightweight repository for managing 1-to-1 connection requests.
-/// Operations are strictly one-shot reads/writes with zero ongoing listeners.
+/// Enforces self-request prevention, block relationship prevention, and duplicate pending prevention.
 class ConnectionRequestRepository {
   ConnectionRequestRepository({
     FirebaseFirestore? firestore,
@@ -22,8 +22,14 @@ class ConnectionRequestRepository {
   final NotificationRepository? _customNotificationRepo;
   final SafetyRepository? _customSafetyRepo;
 
-  FirebaseFirestore get _firestore =>
-      _customFirestore ?? FirebaseFirestore.instance;
+  FirebaseFirestore? get _firestore {
+    if (_customFirestore != null) return _customFirestore;
+    try {
+      return FirebaseFirestore.instance;
+    } catch (_) {
+      return null;
+    }
+  }
 
   NotificationRepository get _notificationRepo =>
       _customNotificationRepo ??
@@ -32,27 +38,33 @@ class ConnectionRequestRepository {
   SafetyRepository get _safetyRepo =>
       _customSafetyRepo ?? SafetyRepository(firestore: _customFirestore);
 
-  CollectionReference<Map<String, dynamic>> get _requestsCollection =>
-      _firestore.collection('connection_requests');
+  CollectionReference<Map<String, dynamic>>? get _requestsCollection =>
+      _firestore?.collection('connection_requests');
 
-  /// Send a connection request to a candidate helper.
+  /// Send a connection request to a candidate peer or helper.
   /// Enforces self-request prevention, block prevention, and duplicate pending request prevention.
   Future<String> sendConnectRequest({
     required String fromUserId,
     required String toUserId,
     required String needId,
+    String? fromUserName,
+    String? fromUserPhotoUrl,
+    String? fromUserProfession,
+    String? toUserName,
   }) async {
-    // 1. Prevent self-requests
+    // 1. Prevent empty IDs
     if (fromUserId.isEmpty || toUserId.isEmpty) {
       throw ArgumentError('User IDs must not be empty.');
     }
+
+    // 2. Prevent self-requests
     if (fromUserId == toUserId) {
       throw ArgumentError(
         'Users cannot send connection requests to themselves.',
       );
     }
 
-    // 2. Prevent requests if either user has blocked the other
+    // 3. Prevent requests if either user has blocked the other
     final blocked = await _safetyRepo.isBlocked(
       userA: fromUserId,
       userB: toUserId,
@@ -63,10 +75,18 @@ class ConnectionRequestRepository {
       );
     }
 
+    final col = _requestsCollection;
+    final effectiveNeedId =
+        needId.trim().isNotEmpty ? needId.trim() : 'direct_connection';
+    final docId = '${fromUserId}_${toUserId}_$effectiveNeedId';
+
+    if (col == null) {
+      return docId;
+    }
+
     try {
-      // 2. Prevent duplicate pending requests using deterministic doc ID (index-free)
-      final docId = '${fromUserId}_${toUserId}_$needId';
-      final existingDoc = await _requestsCollection.doc(docId).get();
+      // 4. Prevent duplicate pending requests using deterministic doc ID
+      final existingDoc = await col.doc(docId).get();
       if (existingDoc.exists && existingDoc.data()?['status'] == 'pending') {
         debugPrint(
           'ConnectionRequestRepository: duplicate pending request detected.',
@@ -74,31 +94,35 @@ class ConnectionRequestRepository {
         return docId;
       }
 
-      // 3. Create new connection request
-      final docRef = _requestsCollection.doc(docId);
+      // 5. Create new connection request
+      final docRef = col.doc(docId);
       final request = ConnectionRequestModel(
         id: docId,
         fromUserId: fromUserId,
         toUserId: toUserId,
-        needId: needId,
+        needId: effectiveNeedId,
         status: 'pending',
+        fromUserName: fromUserName,
+        fromUserPhotoUrl: fromUserPhotoUrl,
+        fromUserProfession: fromUserProfession,
+        toUserName: toUserName,
       );
 
       await docRef.set(request.toMap(useServerTimestamp: true));
 
-      // 4. Create in-app notification for the recipient
+      // 6. Create in-app notification for the recipient
       try {
-        final senderName =
-            AuthService.instance.currentUser?.displayName?.isNotEmpty == true
+        final senderDisplayName = fromUserName ??
+            (AuthService.instance.currentUser?.displayName?.isNotEmpty == true
                 ? AuthService.instance.currentUser!.displayName!
-                : 'A peer';
+                : 'A peer');
 
         await _notificationRepo.createNotification(
           recipientId: toUserId,
           senderId: fromUserId,
           type: 'connection_request',
           title: 'New Connection Request',
-          body: '$senderName wants to connect with you.',
+          body: '$senderDisplayName wants to connect with you.',
           referenceId: docId,
         );
       } catch (notifErr) {
@@ -123,8 +147,11 @@ class ConnectionRequestRepository {
       throw ArgumentError('Status must be either "accepted" or "declined".');
     }
 
+    final col = _requestsCollection;
+    if (col == null) return;
+
     try {
-      final docSnapshot = await _requestsCollection.doc(requestId).get();
+      final docSnapshot = await col.doc(requestId).get();
       if (!docSnapshot.exists || docSnapshot.data() == null) {
         throw StateError('Connection request not found.');
       }
@@ -138,7 +165,7 @@ class ConnectionRequestRepository {
         );
       }
 
-      await _requestsCollection.doc(requestId).update({
+      await col.doc(requestId).update({
         'status': status,
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -147,6 +174,8 @@ class ConnectionRequestRepository {
       if (status == 'accepted') {
         final fromUserId = data['fromUserId'] as String? ?? '';
         final needId = data['needId'] as String? ?? '';
+        final fromUserName = data['fromUserName'] as String?;
+        final toUserName = data['toUserName'] as String?;
 
         if (fromUserId.isNotEmpty) {
           // Initialize chat immediately
@@ -156,11 +185,20 @@ class ConnectionRequestRepository {
               notificationRepository: _notificationRepo,
               safetyRepository: _safetyRepo,
             );
+            final namesMap = <String, String>{};
+            if (fromUserName != null && fromUserName.isNotEmpty) {
+              namesMap[fromUserId] = fromUserName;
+            }
+            if (toUserName != null && toUserName.isNotEmpty) {
+              namesMap[responderUserId] = toUserName;
+            }
+
             await chatRepo.getOrCreateChat(
               connectionRequestId: requestId,
               needId: needId,
               user1: fromUserId,
               user2: responderUserId,
+              participantNames: namesMap.isNotEmpty ? namesMap : null,
             );
           } catch (chatErr) {
             debugPrint('Notice: chat creation error: $chatErr');
@@ -186,14 +224,167 @@ class ConnectionRequestRepository {
     }
   }
 
+  /// Stream incoming pending requests for user (real-time).
+  Stream<List<ConnectionRequestModel>> streamIncomingRequests(String userId) {
+    if (userId.isEmpty) return Stream.value(const []);
+    final col = _requestsCollection;
+    if (col == null) return Stream.value(const []);
+
+    return col
+        .where('toUserId', isEqualTo: userId)
+        .where('status', isEqualTo: 'pending')
+        .snapshots()
+        .map((snapshot) {
+          final list = snapshot.docs
+              .map((doc) => ConnectionRequestModel.fromMap(doc.id, doc.data()))
+              .toList();
+          list.sort((a, b) {
+            final tA = a.createdAt ?? DateTime(2000);
+            final tB = b.createdAt ?? DateTime(2000);
+            return tB.compareTo(tA);
+          });
+          return list;
+        });
+  }
+
+  /// One-shot fetch for incoming pending requests.
+  Future<List<ConnectionRequestModel>> getIncomingRequests(String userId) async {
+    if (userId.isEmpty) return const [];
+    final col = _requestsCollection;
+    if (col == null) return const [];
+
+    try {
+      final snapshot = await col
+          .where('toUserId', isEqualTo: userId)
+          .where('status', isEqualTo: 'pending')
+          .get();
+
+      final list = snapshot.docs
+          .map((doc) => ConnectionRequestModel.fromMap(doc.id, doc.data()))
+          .toList();
+      list.sort((a, b) {
+        final tA = a.createdAt ?? DateTime(2000);
+        final tB = b.createdAt ?? DateTime(2000);
+        return tB.compareTo(tA);
+      });
+      return list;
+    } catch (e) {
+      debugPrint('ConnectionRequestRepository.getIncomingRequests error: $e');
+      return const [];
+    }
+  }
+
+  /// Stream sent requests by user (pending, accepted, or declined).
+  Stream<List<ConnectionRequestModel>> streamSentRequests(String userId) {
+    if (userId.isEmpty) return Stream.value(const []);
+    final col = _requestsCollection;
+    if (col == null) return Stream.value(const []);
+
+    return col
+        .where('fromUserId', isEqualTo: userId)
+        .snapshots()
+        .map((snapshot) {
+          final list = snapshot.docs
+              .map((doc) => ConnectionRequestModel.fromMap(doc.id, doc.data()))
+              .toList();
+          list.sort((a, b) {
+            final tA = a.updatedAt ?? a.createdAt ?? DateTime(2000);
+            final tB = b.updatedAt ?? b.createdAt ?? DateTime(2000);
+            return tB.compareTo(tA);
+          });
+          return list;
+        });
+  }
+
+  /// One-shot fetch for sent requests.
+  Future<List<ConnectionRequestModel>> getSentRequests(String userId) async {
+    if (userId.isEmpty) return const [];
+    final col = _requestsCollection;
+    if (col == null) return const [];
+
+    try {
+      final snapshot = await col
+          .where('fromUserId', isEqualTo: userId)
+          .get();
+
+      final list = snapshot.docs
+          .map((doc) => ConnectionRequestModel.fromMap(doc.id, doc.data()))
+          .toList();
+      list.sort((a, b) {
+        final tA = a.updatedAt ?? a.createdAt ?? DateTime(2000);
+        final tB = b.updatedAt ?? b.createdAt ?? DateTime(2000);
+        return tB.compareTo(tA);
+      });
+      return list;
+    } catch (e) {
+      debugPrint('ConnectionRequestRepository.getSentRequests error: $e');
+      return const [];
+    }
+  }
+
+  /// Retrieve the active or most recent connection request between two users.
+  Future<ConnectionRequestModel?> getConnectionRequestBetween({
+    required String userA,
+    required String userB,
+  }) async {
+    if (userA.isEmpty || userB.isEmpty) return null;
+    final col = _requestsCollection;
+    if (col == null) return null;
+
+    try {
+      // 1. Check A -> B
+      final snapA = await col
+          .where('fromUserId', isEqualTo: userA)
+          .where('toUserId', isEqualTo: userB)
+          .limit(5)
+          .get();
+
+      // 2. Check B -> A
+      final snapB = await col
+          .where('fromUserId', isEqualTo: userB)
+          .where('toUserId', isEqualTo: userA)
+          .limit(5)
+          .get();
+
+      final allDocs = [...snapA.docs, ...snapB.docs];
+      if (allDocs.isEmpty) return null;
+
+      final requests = allDocs
+          .map((doc) => ConnectionRequestModel.fromMap(doc.id, doc.data()))
+          .toList();
+
+      // Prioritize accepted first, then pending, then most recently updated
+      requests.sort((a, b) {
+        if (a.status == 'accepted' && b.status != 'accepted') return -1;
+        if (b.status == 'accepted' && a.status != 'accepted') return 1;
+        if (a.status == 'pending' && b.status != 'pending') return -1;
+        if (b.status == 'pending' && a.status != 'pending') return 1;
+
+        final tA = a.updatedAt ?? a.createdAt ?? DateTime(2000);
+        final tB = b.updatedAt ?? b.createdAt ?? DateTime(2000);
+        return tB.compareTo(tA);
+      });
+
+      return requests.first;
+    } catch (e) {
+      debugPrint(
+        'ConnectionRequestRepository.getConnectionRequestBetween notice: $e',
+      );
+      return null;
+    }
+  }
+
   /// Get recipient IDs for requests already sent by user for this specific need.
   /// Used by MatchingSheet to immediately initialize "Request Sent" state without unbounded queries.
   Future<Set<String>> getSentRecipientIdsForNeed({
     required String fromUserId,
     required String needId,
   }) async {
+    final col = _requestsCollection;
+    if (col == null) return const {};
+
     try {
-      final snapshot = await _requestsCollection
+      final snapshot = await col
           .where('fromUserId', isEqualTo: fromUserId)
           .where('needId', isEqualTo: needId)
           .limit(20)

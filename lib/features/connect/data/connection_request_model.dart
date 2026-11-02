@@ -9,6 +9,10 @@ class ConnectionRequestModel {
     required this.toUserId,
     required this.needId,
     this.status = 'pending',
+    this.fromUserName,
+    this.fromUserPhotoUrl,
+    this.fromUserProfession,
+    this.toUserName,
     this.createdAt,
     this.updatedAt,
   });
@@ -18,6 +22,10 @@ class ConnectionRequestModel {
   final String toUserId;
   final String needId;
   final String status; // 'pending' | 'accepted' | 'declined'
+  final String? fromUserName;
+  final String? fromUserPhotoUrl;
+  final String? fromUserProfession;
+  final String? toUserName;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -27,6 +35,14 @@ class ConnectionRequestModel {
       'toUserId': toUserId,
       'needId': needId,
       'status': status,
+      if (fromUserName != null && fromUserName!.isNotEmpty)
+        'fromUserName': fromUserName,
+      if (fromUserPhotoUrl != null && fromUserPhotoUrl!.isNotEmpty)
+        'fromUserPhotoUrl': fromUserPhotoUrl,
+      if (fromUserProfession != null && fromUserProfession!.isNotEmpty)
+        'fromUserProfession': fromUserProfession,
+      if (toUserName != null && toUserName!.isNotEmpty)
+        'toUserName': toUserName,
       'createdAt': createdAt != null
           ? Timestamp.fromDate(createdAt!)
           : (useServerTimestamp ? FieldValue.serverTimestamp() : null),
@@ -47,6 +63,10 @@ class ConnectionRequestModel {
       toUserId: map['toUserId'] as String? ?? '',
       needId: map['needId'] as String? ?? '',
       status: map['status'] as String? ?? 'pending',
+      fromUserName: map['fromUserName'] as String?,
+      fromUserPhotoUrl: map['fromUserPhotoUrl'] as String?,
+      fromUserProfession: map['fromUserProfession'] as String?,
+      toUserName: map['toUserName'] as String?,
       createdAt: parseDate(map['createdAt']),
       updatedAt: parseDate(map['updatedAt']),
     );
@@ -58,6 +78,10 @@ class ConnectionRequestModel {
     String? toUserId,
     String? needId,
     String? status,
+    String? fromUserName,
+    String? fromUserPhotoUrl,
+    String? fromUserProfession,
+    String? toUserName,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -67,6 +91,10 @@ class ConnectionRequestModel {
       toUserId: toUserId ?? this.toUserId,
       needId: needId ?? this.needId,
       status: status ?? this.status,
+      fromUserName: fromUserName ?? this.fromUserName,
+      fromUserPhotoUrl: fromUserPhotoUrl ?? this.fromUserPhotoUrl,
+      fromUserProfession: fromUserProfession ?? this.fromUserProfession,
+      toUserName: toUserName ?? this.toUserName,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
