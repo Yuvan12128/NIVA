@@ -19,19 +19,21 @@ class NivaInfinityLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      height: height,
-      child: CustomPaint(
-        size: Size(width, height),
-        painter: _InfinityLogoPainter(
-          strokeWidth: strokeWidth ?? (width * 0.18),
-          gradientColors: gradientColors ??
-              const [
-                Color(0xFF007AFF), // Apple Blue
-                Color(0xFF0091FF), // Vivid Azure
-                Color(0xFF00B4D8), // Cyan hint
-              ],
+    return RepaintBoundary(
+      child: SizedBox(
+        width: width,
+        height: height,
+        child: CustomPaint(
+          size: Size(width, height),
+          painter: _InfinityLogoPainter(
+            strokeWidth: strokeWidth ?? (width * 0.18),
+            gradientColors: gradientColors ??
+                const [
+                  Color(0xFF007AFF), // Apple Blue
+                  Color(0xFF0091FF), // Vivid Azure
+                  Color(0xFF00B4D8), // Cyan hint
+                ],
+          ),
         ),
       ),
     );
